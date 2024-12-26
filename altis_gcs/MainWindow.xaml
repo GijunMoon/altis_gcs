@@ -1,0 +1,186 @@
+﻿<Window x:Class="altis_gcs.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:LiveCharts="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+        xmlns:helix="http://helix-toolkit.org/wpf"
+        xmlns:local="clr-namespace:altis_gcs"
+        Title="Telemetry GUI for Payload" Height="800" Width="1200">
+
+    <Window.Resources>
+        <local:InvConverter x:Key="InvConverter"/>
+    </Window.Resources>
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- 상단 메뉴 -->
+            <RowDefinition Height="*"/>
+            <!-- 메인 영역 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 하단 로그 -->
+        </Grid.RowDefinitions>
+
+        <!-- 상단 메뉴 -->
+        <DockPanel Grid.Row="0" Background="#D3D3D3" Height="50" Margin="5">
+            <!-- 메뉴 그룹 1 -->
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="5">
+                <Button Content="Capture Data" Margin="5" Width="120" Height="30"/>
+                <Button Content="Image, Chart, Map Control" Margin="5" Width="180" Height="30"/>
+            </StackPanel>
+
+            <!-- 메뉴 그룹 2 -->
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="5">
+                <Button Content="Use ECC" Margin="5" Width="100" Height="30"/>
+                <Button Content="Data Log" Margin="5" Width="100" Height="30"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- 메인 콘텐츠 -->
+        <Grid Grid.Row="1" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <!-- 좌측: 그래프 -->
+                <ColumnDefinition Width="3*"/>
+                <!-- 중앙: 지도 -->
+                <ColumnDefinition Width="2*"/>
+                <!-- 우측: 3D 모델 -->
+            </Grid.ColumnDefinitions>
+
+            <!-- 그래프 -->
+            <GroupBox Header="Accelerometer Real-Time Chart" Margin="5,5,5,238" Grid.Column="0">
+                <LiveCharts:CartesianChart Name="AccelerometerChart" Height="394">
+                    <LiveCharts:CartesianChart.Series>
+                        <LiveCharts:LineSeries Title="X"
+                                               Values="{x:Static local:DataModel.AccelerometerX}" />
+                    </LiveCharts:CartesianChart.Series>
+                </LiveCharts:CartesianChart>
+            </GroupBox>
+
+            <!-- 지도 -->
+            <GroupBox Header="Location and Surveillance" Grid.Column="1" Margin="5">
+                <TabControl>
+                    <TabItem Header="Location Map">
+                        <Grid>
+                            <!-- 지도 Placeholder -->
+                            <TextBlock Text="Map Placeholder" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Image Capture">
+                        <Grid>
+                            <!-- 이미지 Placeholder -->
+                            <TextBlock Text="Image Capture Placeholder" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </GroupBox>
+
+            <GroupBox Header="3D Attitude Model" Grid.Column="2" Margin="5">
+                <helix:HelixViewport3D>
+                    <!-- 카메라 설정 -->
+                    <helix:HelixViewport3D.Camera>
+                        <PerspectiveCamera Position="0,0,100" LookDirection="0,0,-1" UpDirection="0,1,0" FieldOfView="45" />
+                    </helix:HelixViewport3D.Camera>
+
+                    <!-- 조명 -->
+                    <ModelVisual3D>
+                        <ModelVisual3D.Content>
+                            <DirectionalLight Color="White" Direction="-1,-1,-1" />
+                        </ModelVisual3D.Content>
+                    </ModelVisual3D>
+
+                    <!-- 로켓 모델 -->
+                    <ModelVisual3D x:Name="RocketModel" />
+                </helix:HelixViewport3D>
+            </GroupBox>
+
+        </Grid>
+
+        <!-- 하단 영역 -->
+        <Grid Grid.Row="2" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <!-- 좌측: 계기판 -->
+                <ColumnDefinition Width="3*"/>
+                <!-- 중앙: 로그 -->
+            </Grid.ColumnDefinitions>
+
+            <!-- 2D 계기판 -->
+            <GroupBox Header="2D Attitude Instrumentation" Grid.Column="0" Margin="13,-239,143,63">
+                <Grid>
+                    <GroupBox Header="2D Instruments" Grid.Row="2" Margin="10" Grid.Column="0">
+                        <Grid Height="200" Margin="0,0,72,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 자세계 추가 -->
+                            <Viewbox Grid.Row="0"
+                 Stretch="Uniform"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 ClipToBounds="True" Width="200" Height="200">
+
+                                <Canvas Width="200" Height="200">
+                                    <!-- Horizon: Roll 회전 + Pitch 이동 -->
+                                    <Image Width="200" Height="200" Canvas.Left="0" Canvas.Top="0"
+                       RenderTransformOrigin="0.5,0.5">
+                                        <Image.RenderTransform>
+                                            <TransformGroup>
+                                                <RotateTransform Angle="{Binding Roll}" />
+                                                <TranslateTransform Y="{Binding Pitch, Converter={StaticResource InvConverter}}" />
+                                            </TransformGroup>
+                                        </Image.RenderTransform>
+                                        <Image.Source>
+                                            <DrawingImage>
+                                                <DrawingImage.Drawing>
+                                                    <DrawingGroup>
+                                                        <!-- last.png를 100x100 영역에 그리기 -->
+                                                        <ImageDrawing ImageSource="images\last.png" Rect="0,0,100,100" />
+
+                                                        <!-- 원형 Clip: (가로=100, 세로=100)에 맞춰 중심(50,50), 반지름=50 -->
+                                                        <DrawingGroup.ClipGeometry>
+                                                            <EllipseGeometry Center="50,50" RadiusX="50" RadiusY="50" />
+                                                        </DrawingGroup.ClipGeometry>
+                                                    </DrawingGroup>
+                                                </DrawingImage.Drawing>
+                                            </DrawingImage>
+                                        </Image.Source>
+                                    </Image>
+
+                                    <!-- Outer: 고정 -->
+                                    <Image Source="images\outer.png"
+                       Width="200" Height="200"
+                       Canvas.Left="0" Canvas.Top="0"
+                       Panel.ZIndex="1"/>
+
+                                    <!-- Compass: Yaw 회전 -->
+                                    <Image Source="images\compass.png"
+                       Width="200" Height="200"
+                       Canvas.Left="0" Canvas.Top="0"
+                       RenderTransformOrigin="0.5,0.5"
+                       Panel.ZIndex="2">
+                                        <Image.RenderTransform>
+                                            <RotateTransform Angle="{Binding Yaw}"/>
+                                        </Image.RenderTransform>
+                                    </Image>
+
+                                    <!-- Plane: 중앙 고정 -->
+                                    <Image Source="images\middle.png"
+                       Width="200" Height="200"
+                       Panel.ZIndex="3" Canvas.Left="0"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Grid>
+                    </GroupBox>
+
+                </Grid>
+            </GroupBox>
+
+            <!-- 로그 -->
+            <GroupBox Header="System Log" Grid.Column="1" Margin="5">
+                <TextBox Name="LogTextBox" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
+            </GroupBox>
+        </Grid>
+    </Grid>
+</Window>
