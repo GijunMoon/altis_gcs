@@ -37,9 +37,13 @@
                     <Grid Background="Black">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="*"/>
+                            <!-- 타이틀 영역 -->
                             <RowDefinition Height="Auto"/>
+                            <!-- 버튼 행 1 -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- 버튼 행 2 -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- 타이머 및 데이터 저장 버튼 -->
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -49,39 +53,43 @@
                         <!-- 타이틀 영역 -->
                         <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="CONTROL" 
                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="28" FontWeight="Bold" Foreground="White" Margin="10"/>
+                   FontSize="24" FontWeight="Bold" Foreground="White" Margin="5"/>
 
                         <!-- LOAD MISSION DATA 버튼 -->
-                        <Button Grid.Row="1" Grid.Column="0" Content="미션 데이터 불러오기" 
-                Click="SelectCsvFile_Click" Margin="10"
-                FontSize="22" FontWeight="Bold"
-                Background="#FF0066CC" Foreground="White" Height="90"/>
+                        <Button Grid.Row="3" Grid.Column="0" Content="미션 데이터 불러오기" 
+                Click="SelectCsvFile_Click" Margin="5,79,5,-89"
+                FontSize="18" FontWeight="Bold"
+                Background="#FF0066CC" Foreground="White" Height="60"/>
 
                         <!-- 발사 시작 버튼 -->
-                        <Button Grid.Row="1" Grid.Column="1" Content="발사 시작" 
-                Click="StartLaunch_Click" Margin="10"
-                FontSize="22" FontWeight="Bold"
-                Background="#FF009900" Foreground="White" Height="90"/>
+                        <Button Grid.Row="3" Grid.Column="1" Content="발사 시작" 
+                Click="StartLaunch_Click" Margin="5,79,5,-89"
+                FontSize="18" FontWeight="Bold"
+                Background="#FF009900" Foreground="White" Height="60"/>
 
                         <!-- ABORT LAUNCH 버튼 -->
-                        <Button Grid.Row="2" Grid.Column="0" Content="비 상 사 출" 
-                Click="Emergency_Click" Margin="10"
-                FontSize="22" FontWeight="Bold"
-                Background="#FFCC0000" Foreground="White" Height="90"/>
+                        <Button Grid.Row="3" Grid.Column="0" Content="비 상 사 출" 
+                Click="Emergency_Click" Margin="5,180,5,-190"
+                FontSize="18" FontWeight="Bold"
+                Background="#FFCC0000" Foreground="White" Height="60"/>
 
                         <!-- RESET SYSTEM 버튼 -->
-                        <Button Grid.Row="2" Grid.Column="1" Content="시스템 리셋" 
-                Click="ResetSystem_Click" Margin="10"
-                FontSize="22" FontWeight="Bold"
-                Background="#FF333333" Foreground="White" Height="90"/>
+                        <Button Grid.Row="3" Grid.Column="1" Content="시스템 리셋" 
+                Click="ResetSystem_Click" Margin="5,180,5,-190"
+                FontSize="18" FontWeight="Bold"
+                Background="#FF333333" Foreground="White" Height="60"/>
 
-                        <!-- 타이머 표시 영역 -->
-                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" x:Name="TimerDisplay" 
-                   Text="00:00" HorizontalAlignment="Center" VerticalAlignment="Center" 
-                   FontSize="36" FontWeight="Bold" Foreground="White" Margin="10"/>
+                        <!-- 타이머 표시 영역 및 데이터 저장 버튼 -->
+                        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" 
+                    HorizontalAlignment="Left" Margin="366,320,0,-310">
+                            <TextBlock x:Name="TimerDisplay" Text="00:00" FontSize="24" 
+                       FontWeight="Bold" Foreground="White" Margin="10,0"/>
+                            <Button Content="데이터 저장" Click="FlightDataSave_Click" Margin="10,0"
+                    FontSize="18" FontWeight="Bold" Background="#FF009900" 
+                    Foreground="White" Height="40"/>
+                        </StackPanel>
                     </Grid>
                 </TabItem>
-
 
                 <TabItem Header="Parameter Settings">
                     <StackPanel Background="LightGreen">
@@ -97,7 +105,7 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Max Time:" Width="100"/>
-                            <TextBox x:Name="MaxSpeedTextBox" Width="100"/>
+                            <TextBox x:Name="MaxTimeTextBox" Width="100"/>
                         </StackPanel>
                         <Button Content="Update Parameters" Margin="5" Click="UpdateParameters_Click"/>
                     </StackPanel>
@@ -144,7 +152,7 @@
                         </StackPanel>
                         <StackPanel Margin="10">
                             <TextBlock Text="System Logs:" FontWeight="Bold"/>
-                            <ListBox x:Name="SystemLogs" Width="429" Height="140"/>
+                            <ListBox x:Name="SystemLogs" Width="362" Height="140"/>
                             <!-- 시리얼 메시지 입력창과 전송 버튼 추가 -->
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <TextBox x:Name="SerialMessageTextBox" Width="323" Height="23" Margin="0,0,5,0"/>
