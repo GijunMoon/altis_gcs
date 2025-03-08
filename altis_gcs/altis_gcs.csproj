@@ -103,8 +103,12 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Navigation.cs" />
     <Compile Include="DataProcessor.cs" />
     <Compile Include="ModelManager.cs" />
+    <Compile Include="RocketPathWindow.xaml.cs">
+      <DependentUpon>RocketPathWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="SerialCommunication.cs" />
     <Compile Include="TimerManager.cs" />
     <Page Include="MainWindow.xaml">
@@ -119,6 +123,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="RocketPathWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MapController.cs" />
