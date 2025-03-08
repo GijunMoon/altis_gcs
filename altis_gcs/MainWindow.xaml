@@ -92,7 +92,7 @@
                 </TabItem>
 
                 <TabItem Header="Parameter Settings">
-                    <StackPanel Background="LightGreen">
+                    <StackPanel Background="#A2CAA1">
                         <TextBlock Text="Telemetry Port Settings" FontSize="16" FontWeight="Bold" Margin="5"/>
                         <ComboBox x:Name="SerialPortComboBox" Margin="5" Width="150" HorizontalAlignment="Left"/>
                         <Button Content="Refresh Ports" Margin="5" Click="RefreshPorts_Click"/>
@@ -149,6 +149,7 @@
                             <TextBlock x:Name="AltitudeData" Text="0 m" Width="60"/>
                             <TextBlock Text="Velocity:" FontWeight="Bold"/>
                             <TextBlock x:Name="VelocityData" Text="0 m/s" Width="60"/>
+                            <Button Content="Show Path" Click="ShowPath_Click" Margin="5"/>
                         </StackPanel>
                         <StackPanel Margin="10">
                             <TextBlock Text="System Logs:" FontWeight="Bold"/>

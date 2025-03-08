@@ -23,8 +23,18 @@ namespace altis_gcs
         {
             _serialPort = new SerialPort(_portName, _baudRate);
             _serialPort.DataReceived += OnDataReceived;
-            _serialPort.Open();
-            isConnected = true;
+
+            try //빈 포트 연결 방지
+            {
+                _serialPort.Open();
+                isConnected = true;
+                MessageBox.Show("Connected to " + _portName);
+            }
+            catch(Exception ex)
+            {
+                isConnected = false;
+                MessageBox.Show("포트 에러 발생: " + ex);
+            }
         }
 
         public void Disconnect()

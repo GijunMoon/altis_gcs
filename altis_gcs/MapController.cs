@@ -23,7 +23,7 @@ namespace altis_gcs
 
         private void InitializeMap()
         {
-            GoogleMapProvider.Instance.ApiKey = "YOUR_API_KEY_HERE";
+            GoogleMapProvider.Instance.ApiKey = "AIzaSyCXJrDpszuNQfMEXKIifx5zYzhSq3Irpyg";
             _mapControl.MapProvider = GMapProviders.OpenStreetMap;
             _mapControl.Position = new PointLatLng(35.1543, 128.0931);
             _mapControl.MinZoom = 2;

@@ -13,10 +13,11 @@ namespace altis_gcs
     public partial class MainWindow : Window
     {
         private readonly SerialCommunication _serialComm;
-        private readonly DataProcessor _dataProcessor;
+        private readonly DataProcessor _dataProcessor; //CSV 데이터 처리기
         private readonly ModelManager _modelManager;
         private readonly MapController _mapController;
         private readonly TimerManager _timerManager;
+        private readonly Navigation _calculator; //비행 경로 연산기 
 
         public PlotModel CombinedAccelerationPlotModel { get; private set; } = new PlotModel { Title = "가속도 그래프" };
         public PlotModel GyroPlotModel { get; private set; } = new PlotModel { Title = "자이로 그래프" };
@@ -57,7 +58,6 @@ namespace altis_gcs
 
             string selectedPort = SerialPortComboBox.SelectedItem.ToString();
             _serialComm.Connect();
-            MessageBox.Show("Connected to " + selectedPort);
         }
 
         private void Disconnect_Click(object sender, RoutedEventArgs e)
@@ -215,6 +215,12 @@ namespace altis_gcs
             LongSlider.Value = 0;
             _modelManager.UpdateTransform(RollSlider.Value, PitchSlider.Value, YawSlider.Value);
             RollSlider.Value = 0;
+        }
+
+        private void ShowPath_Click(object sender, RoutedEventArgs e)
+        {
+            RocketPathWindow popup = new RocketPathWindow();
+            popup.Show();
         }
     }
 }
