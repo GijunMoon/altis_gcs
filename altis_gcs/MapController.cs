@@ -25,10 +25,10 @@ namespace altis_gcs
         {
             GoogleMapProvider.Instance.ApiKey = "AIzaSyCXJrDpszuNQfMEXKIifx5zYzhSq3Irpyg";
             _mapControl.MapProvider = GMapProviders.OpenStreetMap;
-            _mapControl.Position = new PointLatLng(35.1543, 128.0931);
+            _mapControl.Position = new PointLatLng(34.61013470769485, 127.20767755769276);
             _mapControl.MinZoom = 2;
             _mapControl.MaxZoom = 17;
-            _mapControl.Zoom = 13;
+            _mapControl.Zoom = 13; //초기 줌 레벨 최대에서 한 칸 전 레벨
             _mapControl.ShowCenter = false;
             _mapControl.DragButton = MouseButton.Left;
         }

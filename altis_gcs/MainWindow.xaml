@@ -4,7 +4,7 @@
         xmlns:oxy="http://oxyplot.org/wpf"
         xmlns:helix="http://helix-toolkit.org/wpf"
         xmlns:gmap="clr-namespace:GMap.NET.WindowsPresentation;assembly=GMap.NET.WindowsPresentation"
-        Title="Rocket Control Station" Height="1080" Width="1920"
+        Title="Rocket Control Station" Height="1080" Width="1920" Background="WhiteSmoke"
         MinHeight="600" MinWidth="800">
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
         <Grid>
@@ -29,6 +29,7 @@
                 <oxy:PlotView x:Name="Acceleration" Grid.Row="0" Margin="10"/>
                 <!-- Angular Velocity Chart -->
                 <oxy:PlotView x:Name="Gyro" Grid.Row="1" Margin="10"/>
+                <Label x:Name="DataLabel" Content="데이터를 불러와주세요" HorizontalAlignment="Center" Margin="0,366,0,0" VerticalAlignment="Top" Height="40" Width="236" FontSize="22" Grid.RowSpan="2"/>
             </Grid>
 
             <!-- 탭 컨트롤: Command Panel, Parameter Settings, GPS 탭 -->
@@ -94,10 +95,57 @@
                 <TabItem Header="Parameter Settings">
                     <StackPanel Background="#A2CAA1">
                         <TextBlock Text="Telemetry Port Settings" FontSize="16" FontWeight="Bold" Margin="5"/>
-                        <ComboBox x:Name="SerialPortComboBox" Margin="5" Width="150" HorizontalAlignment="Left"/>
+                        <!-- 시리얼 포트 설정 추가 -->
+                        <StackPanel Orientation="Horizontal" Margin="5">
+                            <TextBlock Text="Port:" Width="100" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="SerialPortComboBox" Width="150" Margin="5" SelectedIndex="0">
+                                <ComboBoxItem>COM1</ComboBoxItem>
+                                <ComboBoxItem>COM2</ComboBoxItem>
+                                <ComboBoxItem>COM3</ComboBoxItem>
+                                <ComboBoxItem>COM4</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="5">
+                            <TextBlock Text="Baud Rate:" Width="100" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="BaudRateComboBox" Width="150" Margin="5" SelectedIndex="0">
+                                <ComboBoxItem>9600</ComboBoxItem>
+                                <ComboBoxItem>19200</ComboBoxItem>
+                                <ComboBoxItem>38400</ComboBoxItem>
+                                <ComboBoxItem>57600</ComboBoxItem>
+                                <ComboBoxItem>115200</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="5">
+                            <TextBlock Text="Data Bits:" Width="100" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="DataBitsComboBox" Width="150" Margin="5" SelectedIndex="0">
+                                <ComboBoxItem>8</ComboBoxItem>
+                                <ComboBoxItem>7</ComboBoxItem>
+                                <ComboBoxItem>6</ComboBoxItem>
+                                <ComboBoxItem>5</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="5">
+                            <TextBlock Text="Parity:" Width="100" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="ParityComboBox" Width="150" Margin="5" SelectedIndex="0">
+                                <ComboBoxItem>None</ComboBoxItem>
+                                <ComboBoxItem>Odd</ComboBoxItem>
+                                <ComboBoxItem>Even</ComboBoxItem>
+                                <ComboBoxItem>Mark</ComboBoxItem>
+                                <ComboBoxItem>Space</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="5">
+                            <TextBlock Text="Stop Bits:" Width="100" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="StopBitsComboBox" Width="150" Margin="5" SelectedIndex="0">
+                                <ComboBoxItem>1</ComboBoxItem>
+                                <ComboBoxItem>1.5</ComboBoxItem>
+                                <ComboBoxItem>2</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
                         <Button Content="Refresh Ports" Margin="5" Click="RefreshPorts_Click"/>
                         <Button Content="Connect" Margin="5" Click="Connect_Click"/>
                         <Button Content="Disconnect" Margin="5" Click="Disconnect_Click"/>
+
                         <TextBlock Text="Flight Parameters" FontSize="16" FontWeight="Bold" Margin="5"/>
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Max Altitude:" Width="100"/>
@@ -116,6 +164,7 @@
                                   VerticalContentAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                   Margin="10">
                             <gmap:GMapControl x:Name="mapControl" Zoom="13" MaxZoom="24" MinZoom="1"/>
+                            <!--경로표현window와 병합-->
                         </GroupBox>
                     </Grid>
                 </TabItem>
