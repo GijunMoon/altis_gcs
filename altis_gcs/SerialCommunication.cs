@@ -21,11 +21,12 @@ namespace altis_gcs
 
         public void Connect()
         {
-            _serialPort = new SerialPort(_portName, _baudRate);
-            _serialPort.DataReceived += OnDataReceived;
 
             try //빈 포트 연결 방지
             {
+                _serialPort = new SerialPort(_portName, _baudRate);
+                _serialPort.DataReceived += OnDataReceived;
+
                 _serialPort.Open();
                 isConnected = true;
                 MessageBox.Show("Connected to " + _portName);
@@ -65,6 +66,6 @@ namespace altis_gcs
             {
                 // UI 스레드에서 오류 처리 필요 시 별도 이벤트로 전달 가능
             }
-        }
+        } /*형식에 맞게 데이터 슬라이스*/
     }
 }

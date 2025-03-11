@@ -12,7 +12,7 @@ namespace altis_gcs
 {
     public partial class MainWindow : Window
     {
-        private readonly SerialCommunication _serialComm;
+        private SerialCommunication _serialComm;
         private readonly DataProcessor _dataProcessor; //CSV 데이터 처리기
         private readonly ModelManager _modelManager;
         private readonly MapController _mapController;
@@ -27,8 +27,8 @@ namespace altis_gcs
             InitializeComponent();
             DataContext = this;
 
-            _serialComm = new SerialCommunication("COM1", 9600); // 기본 포트와 보드레이트
-            _serialComm.DataReceived += (s, data) => SystemLogs.Items.Add("Received: " + data);
+            //_serialComm = new SerialCommunication("COM1", 9600); // 기본 포트와 보드레이트 /*보드레이트 변경 가능성 有*/
+            //_serialComm.DataReceived += (s, data) => SystemLogs.Items.Add("Received: " + data);
 
             _dataProcessor = new DataProcessor();
             _modelManager = new ModelManager(ModelVisual, "C:/Users/문기준/source/repos/altis_gcs/altis_gcs/Models/rocket.obj");
@@ -56,25 +56,65 @@ namespace altis_gcs
                 return;
             }
 
-            string selectedPort = SerialPortComboBox.SelectedItem.ToString();
+            string portName = SerialPortComboBox.SelectedItem.ToString();
+            int baudRate = int.Parse(((ComboBoxItem)BaudRateComboBox.SelectedItem).Content.ToString());
+            int dataBits = int.Parse(((ComboBoxItem)DataBitsComboBox.SelectedItem).Content.ToString());
+
+            /*변수 구현만*/
+            Parity parity = (Parity)Enum.Parse(typeof(Parity), ((ComboBoxItem)ParityComboBox.SelectedItem).Content.ToString());
+            StopBits stopBits = (StopBits)Enum.Parse(typeof(StopBits), ((ComboBoxItem)StopBitsComboBox.SelectedItem).Content.ToString());
+
+            _serialComm = new SerialCommunication(portName, baudRate);
+
             _serialComm.Connect();
         }
 
         private void Disconnect_Click(object sender, RoutedEventArgs e)
         {
-            _serialComm.Disconnect();
-            MessageBox.Show("Disconnected");
+            try
+            {
+                if (_serialComm == null || !_serialComm.isConnected)
+                {
+                    MessageBox.Show("Not connected to any port.");
+                    return;
+                } else
+                {
+                    _serialComm.Disconnect();
+                    MessageBox.Show("연결 해제");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("포트 에러 발생: " + ex);
+            }
         }
 
         private void SendSerialMessage_Click(object sender, RoutedEventArgs e)
         {
             string message = SerialMessageTextBox.Text;
-            _serialComm.Send(message);
-            SystemLogs.Items.Add("Sent: " + message);
+
+            try
+            {
+                if (_serialComm != null)
+                {
+                    _serialComm.Send(message);
+                    SystemLogs.Items.Add("Sent: " + message);
+                }
+                else
+                {
+                    MessageBox.Show("포트 연결되지 않음!");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("메시지 전송 실패: " + ex.Message);
+            }
         }
+
 
         private void FlightDataSave_Click(object sender, RoutedEventArgs e)
         {
+            /*!비행시작 후 통신으로 들어오는 모든 데이터 저장하도록 로직 수정!*/
             SaveFileDialog saveFileDialog = new SaveFileDialog
             {
                 Filter = "CSV files (*.csv)|*.csv",
@@ -101,14 +141,15 @@ namespace altis_gcs
 
             if (openFileDialog.ShowDialog() == true)
             {
+                this.DataLabel.Visibility = Visibility.Hidden;
                 var (accelX, accelY, accelZ, gyroX, gyroY, gyroZ) = await _dataProcessor.LoadCsvDataAsync(openFileDialog.FileName);
 
-                CombinedAccelerationPlotModel = new PlotModel { Title = "Combined Acceleration" };
+                CombinedAccelerationPlotModel = new PlotModel { Title = "가속도 그래프" };
                 CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel X", ItemsSource = accelX });
                 CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel Y", ItemsSource = accelY });
                 CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel Z", ItemsSource = accelZ });
 
-                GyroPlotModel = new PlotModel { Title = "Gyro Data" };
+                GyroPlotModel = new PlotModel { Title = "자이로 그래프" };
                 GyroPlotModel.Series.Add(new LineSeries { Title = "Gyro X", ItemsSource = gyroX });
                 GyroPlotModel.Series.Add(new LineSeries { Title = "Gyro Y", ItemsSource = gyroY });
                 GyroPlotModel.Series.Add(new LineSeries { Title = "Gyro Z", ItemsSource = gyroZ });
@@ -145,7 +186,7 @@ namespace altis_gcs
         {
             _timerManager.Reset();
             MessageBox.Show("시스템 리셋");
-            _timerManager.Start();
+            /*시스템 리셋 로직 구현*/
         }
 
         private void AltitudeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
