@@ -94,11 +94,10 @@
 
                 <TabItem Header="Parameter Settings">
                     <StackPanel Background="#A2CAA1">
-                        <TextBlock Text="Telemetry Port Settings" FontSize="16" FontWeight="Bold" Margin="5"/>
-                        <!-- 시리얼 포트 설정 추가 -->
+                        <TextBlock Text="통신기 포트 설정" FontSize="16" FontWeight="Bold" Margin="5"/>
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Port:" Width="100" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="SerialPortComboBox" Width="150" Margin="5" SelectedIndex="0">
+                            <ComboBox x:Name="PortComboBox" Width="150" Margin="5" SelectedIndex="0">
                                 <ComboBoxItem>COM1</ComboBoxItem>
                                 <ComboBoxItem>COM2</ComboBoxItem>
                                 <ComboBoxItem>COM3</ComboBoxItem>
@@ -108,54 +107,53 @@
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Baud Rate:" Width="100" VerticalAlignment="Center"/>
                             <ComboBox x:Name="BaudRateComboBox" Width="150" Margin="5" SelectedIndex="0">
-                                <ComboBoxItem>9600</ComboBoxItem>
-                                <ComboBoxItem>19200</ComboBoxItem>
-                                <ComboBoxItem>38400</ComboBoxItem>
-                                <ComboBoxItem>57600</ComboBoxItem>
-                                <ComboBoxItem>115200</ComboBoxItem>
+                                <ComboBoxItem Content="9600" />
+                                <ComboBoxItem Content="19200" />
+                                <ComboBoxItem Content="38400" />
+                                <ComboBoxItem Content="57600" />
+                                <ComboBoxItem Content="115200" />
                             </ComboBox>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Data Bits:" Width="100" VerticalAlignment="Center"/>
                             <ComboBox x:Name="DataBitsComboBox" Width="150" Margin="5" SelectedIndex="0">
-                                <ComboBoxItem>8</ComboBoxItem>
-                                <ComboBoxItem>7</ComboBoxItem>
-                                <ComboBoxItem>6</ComboBoxItem>
-                                <ComboBoxItem>5</ComboBoxItem>
+                                <ComboBoxItem Content="8" />
+                                <ComboBoxItem Content="7" />
+                                <ComboBoxItem Content="6" />
+                                <ComboBoxItem Content="5" />
                             </ComboBox>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Parity:" Width="100" VerticalAlignment="Center"/>
                             <ComboBox x:Name="ParityComboBox" Width="150" Margin="5" SelectedIndex="0">
-                                <ComboBoxItem>None</ComboBoxItem>
-                                <ComboBoxItem>Odd</ComboBoxItem>
-                                <ComboBoxItem>Even</ComboBoxItem>
-                                <ComboBoxItem>Mark</ComboBoxItem>
-                                <ComboBoxItem>Space</ComboBoxItem>
+                                <ComboBoxItem Content="None" />
+                                <ComboBoxItem Content="Odd" />
+                                <ComboBoxItem Content="Even" />
+                                <ComboBoxItem Content="Mark" />
+                                <ComboBoxItem Content="Space" />
                             </ComboBox>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="5">
                             <TextBlock Text="Stop Bits:" Width="100" VerticalAlignment="Center"/>
                             <ComboBox x:Name="StopBitsComboBox" Width="150" Margin="5" SelectedIndex="0">
-                                <ComboBoxItem>1</ComboBoxItem>
-                                <ComboBoxItem>1.5</ComboBoxItem>
-                                <ComboBoxItem>2</ComboBoxItem>
+                                <ComboBoxItem Content="1" />
+                                <ComboBoxItem Content="1.5" />
+                                <ComboBoxItem Content="2" />
                             </ComboBox>
                         </StackPanel>
-                        <Button Content="Refresh Ports" Margin="5" Click="RefreshPorts_Click"/>
-                        <Button Content="Connect" Margin="5" Click="Connect_Click"/>
-                        <Button Content="Disconnect" Margin="5" Click="Disconnect_Click"/>
+                        <Button Content="포트 새로고침" Margin="5" Click="RefreshPorts_Click"/>
+                        <Button Content="연결" Margin="5" Click="Connect_Click" Background="#FF9BE2FF"/>
+                        <Button Content="연결 해제" Margin="5" Click="Disconnect_Click" Background="#FFFF9F9F"/>
 
-                        <TextBlock Text="Flight Parameters" FontSize="16" FontWeight="Bold" Margin="5"/>
+                        <!-- 파라미터 설정 UI 추가 -->
+                        <TextBlock Text="파라미터 파싱 규칙 설정" FontSize="16" FontWeight="Bold" Margin="5"/>
                         <StackPanel Orientation="Horizontal" Margin="5">
-                            <TextBlock Text="Max Altitude:" Width="100"/>
-                            <TextBox x:Name="MaxAltitudeTextBox" Width="100"/>
+                            <TextBlock Text="Parameters:" Width="150" VerticalAlignment="Center"/>
+                            <TextBox x:Name="ParameterOrderTextBox" Width="369" Text="Roll,Pitch,Yaw" Height="20" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="5">
-                            <TextBlock Text="Max Time:" Width="100"/>
-                            <TextBox x:Name="MaxTimeTextBox" Width="100"/>
-                        </StackPanel>
-                        <Button Content="Update Parameters" Margin="5" Click="UpdateParameters_Click"/>
+                        <Button Content="규칙 설정 적용" Margin="5" Click="ApplyParameterSettings_Click" Background="#FFFFA8A8"/>
+                        <StackPanel Orientation="Horizontal" Margin="5"/>
+                        <StackPanel Orientation="Horizontal" Margin="5"/>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="GPS">
