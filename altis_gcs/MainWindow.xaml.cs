@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Ports;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -13,6 +16,8 @@ namespace altis_gcs
     public partial class MainWindow : Window
     {
         private SerialCommunication _serialComm;
+        private CancellationTokenSource _dataProcessingCts;
+
         private readonly DataProcessor _dataProcessor; //CSV 데이터 처리기
         private readonly ModelManager _modelManager;
         private readonly MapController _mapController;
@@ -35,51 +40,79 @@ namespace altis_gcs
             _mapController = new MapController(mapControl);
             _timerManager = new TimerManager();
             _timerManager.ElapsedTimeUpdated += (s, elapsed) => TimerDisplay.Text = elapsed.ToString(@"mm\:ss");
+            _dataProcessingCts = new CancellationTokenSource();
 
             RefreshPorts();
         }
 
         private void RefreshPorts()
         {
-            SerialPortComboBox.Items.Clear();
+            PortComboBox.Items.Clear();
             foreach (string port in SerialPort.GetPortNames())
             {
-                SerialPortComboBox.Items.Add(port);
+                PortComboBox.Items.Add(port);
             }
         }
 
         private void Connect_Click(object sender, RoutedEventArgs e)
         {
-            if (SerialPortComboBox.SelectedItem == null)
+            if (PortComboBox.SelectedItem == null || BaudRateComboBox.SelectedItem == null ||
+                DataBitsComboBox.SelectedItem == null || ParityComboBox.SelectedItem == null ||
+                StopBitsComboBox.SelectedItem == null)
             {
-                MessageBox.Show("포트를 선택하세요.");
+                MessageBox.Show("모든 설정 값을 선택하세요!");
                 return;
             }
 
-            string portName = SerialPortComboBox.SelectedItem.ToString();
-            int baudRate = int.Parse(((ComboBoxItem)BaudRateComboBox.SelectedItem).Content.ToString());
-            int dataBits = int.Parse(((ComboBoxItem)DataBitsComboBox.SelectedItem).Content.ToString());
+            try
+            {
+                string portName = PortComboBox.SelectedItem.ToString();
+                int baudRate = int.Parse(((ComboBoxItem)BaudRateComboBox.SelectedItem).Content.ToString());
+                int dataBits = int.Parse(((ComboBoxItem)DataBitsComboBox.SelectedItem).Content.ToString());
+                Parity parity = (Parity)Enum.Parse(typeof(Parity), ((ComboBoxItem)ParityComboBox.SelectedItem).Content.ToString());
+                StopBits stopBits = (StopBits)Enum.Parse(typeof(StopBits), ((ComboBoxItem)StopBitsComboBox.SelectedItem).Content.ToString());
 
-            /*변수 구현만*/
-            Parity parity = (Parity)Enum.Parse(typeof(Parity), ((ComboBoxItem)ParityComboBox.SelectedItem).Content.ToString());
-            StopBits stopBits = (StopBits)Enum.Parse(typeof(StopBits), ((ComboBoxItem)StopBitsComboBox.SelectedItem).Content.ToString());
+                _serialComm = new SerialCommunication(portName, baudRate, dataBits, parity, stopBits);
+                _serialComm.DataReceived += (s, data) =>
+                {
+                    Dispatcher.Invoke(() => SystemLogs.Items.Add(data));
+                };
+                _serialComm.TelemetryDataParsed += (s, data) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        SystemLogs.Items.Add(data.ToString());
+                        // UI 업데이트 (예: Roll, Pitch, Yaw 표시)
+                        if (data.Parameters.ContainsKey("Roll")) RollData.Text = data.Parameters["Roll"].ToString();
+                        if (data.Parameters.ContainsKey("Pitch")) PitchData.Text = data.Parameters["Pitch"].ToString();
+                        if (data.Parameters.ContainsKey("Yaw")) YawData.Text = data.Parameters["Yaw"].ToString();
+                    });
+                };
+                _serialComm.Connect();
 
-            _serialComm = new SerialCommunication(portName, baudRate);
-
-            _serialComm.Connect();
+                // 데이터 파싱 태스크 시작
+                Task.Run(() => _serialComm.ProcessLinesAsync(_dataProcessingCts.Token));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"연결 실패: {ex.Message}");
+            }
         }
 
         private void Disconnect_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                if (_serialComm == null || !_serialComm.isConnected)
+                if (_serialComm == null || !_serialComm.IsConnected)
                 {
-                    MessageBox.Show("Not connected to any port.");
+                    MessageBox.Show("연결 된 포트가 없습니다.");
                     return;
-                } else
+                }
+                else
                 {
-                    _serialComm.Disconnect();
+                    _dataProcessingCts.Cancel();
+                    _serialComm?.Disconnect();
+                    _dataProcessingCts = new CancellationTokenSource();
                     MessageBox.Show("연결 해제");
                 }
             }
@@ -95,7 +128,7 @@ namespace altis_gcs
 
             try
             {
-                if (_serialComm != null)
+                if (_serialComm != null && !string.IsNullOrEmpty(message))
                 {
                     _serialComm.Send(message);
                     SystemLogs.Items.Add("Sent: " + message);
@@ -109,6 +142,22 @@ namespace altis_gcs
             {
                 MessageBox.Show("메시지 전송 실패: " + ex.Message);
             }
+        }
+
+        private void ApplyParameterSettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(ParameterOrderTextBox.Text))
+            {
+                MessageBox.Show("파라미터 순서를 입력하세요!");
+                return;
+            }
+
+            var settings = new ParameterSettings
+            {
+                ParameterOrder = ParameterOrderTextBox.Text.Split(',').Select(p => p.Trim()).ToList()
+            };
+            _serialComm?.SetParameterSettings(settings);
+            MessageBox.Show("파라미터 설정이 적용되었습니다.");
         }
 
 
@@ -211,10 +260,11 @@ namespace altis_gcs
             RefreshPorts();
         }
 
+        /*레거시*/
         // 매개변수 업데이트 버튼 클릭 이벤트
-        private void UpdateParameters_Click(object sender, RoutedEventArgs e)
+        /*private void UpdateParameters_Click(object sender, RoutedEventArgs e)
         {
-            if (_serialComm == null || !_serialComm.isConnected)
+            if (_serialComm == null || !_serialComm.IsConnected)
             {
                 MessageBox.Show("Not connected to any port.");
                 return;
@@ -232,7 +282,7 @@ namespace altis_gcs
             {
                 MessageBox.Show("Failed to update parameters: " + ex.Message);
             }
-        }
+        }*/
 
         // 위도 슬라이더 값 변경 이벤트
         private void LatSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

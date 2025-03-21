@@ -8,14 +8,11 @@ using GMap.NET.WindowsPresentation;
 
 namespace altis_gcs
 {
-    /*TODO*/
-    /* 위성항법 경로 표현, 관성항법 경로 표현 따로 구현되어 있음.
-     테스트 끝나는대로 메인탭에 통합 예정 */
     public partial class RocketPathWindow : Window
     {
         private readonly Navigation inertialNav = new Navigation();
-
-        private List<PointLatLng> pathPoints = new List<PointLatLng>();
+        private List<PointLatLng> insPathPoints = new List<PointLatLng>(); // 관성항법 경로
+        private List<PointLatLng> gpsPathPoints = new List<PointLatLng>(); // GPS 경로
 
         public RocketPathWindow()
         {
@@ -25,11 +22,11 @@ namespace altis_gcs
 
         private void InitializeMap()
         {
-            mapControl.MapProvider = GMapProviders.OpenStreetMap; // 오픈스트리트맵 사용
-            mapControl.Position = new PointLatLng(34.61013470769485, 127.20767755769276); // 초기 위치 (고흥 우주센터)
+            mapControl.MapProvider = GMapProviders.OpenStreetMap;
+            mapControl.Position = new PointLatLng(34.61013470769485, 127.20767755769276); // 고흥 우주센터
             mapControl.MinZoom = 1;
             mapControl.MaxZoom = 18;
-            mapControl.Zoom = 13; // 초기 줌 레벨
+            mapControl.Zoom = 13;
         }
 
         private void AddPoint_Click(object sender, RoutedEventArgs e)
@@ -37,9 +34,9 @@ namespace altis_gcs
             if (double.TryParse(latTextBox.Text, out double lat) && double.TryParse(lngTextBox.Text, out double lng))
             {
                 PointLatLng newPoint = new PointLatLng(lat, lng);
-                pathPoints.Add(newPoint);
-                UpdatePath();
-                mapControl.Position = newPoint; // 지도 중심 이동
+                gpsPathPoints.Add(newPoint);
+                UpdatePath(gpsPathPoints, System.Windows.Media.Brushes.Blue, "GPS Path");
+                mapControl.Position = newPoint;
             }
             else
             {
@@ -47,17 +44,23 @@ namespace altis_gcs
             }
         }
 
-        private void UpdatePath()
+        private void UpdatePath(List<PointLatLng> points, System.Windows.Media.Brush color, string name)
         {
-            if (pathPoints.Count > 1)
+            if (points.Count > 1)
             {
-                var route = new GMapRoute(pathPoints)
+                var route = new GMapRoute(points)
                 {
-                    Shape = new System.Windows.Shapes.Path { Stroke = System.Windows.Media.Brushes.Red, StrokeThickness = 2 }
+                    Shape = new System.Windows.Shapes.Path { Stroke = color, StrokeThickness = 2 }
                 };
-                mapControl.Markers.Clear();
                 mapControl.Markers.Add(route);
             }
+        }
+
+        private void ClearPaths_Click(object sender, RoutedEventArgs e)
+        {
+            mapControl.Markers.Clear();
+            insPathPoints.Clear();
+            gpsPathPoints.Clear();
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -65,50 +68,96 @@ namespace altis_gcs
             this.Close();
         }
 
-
-        private void TestPath_Click(object sender, RoutedEventArgs e)
+        // 관성항법 경로 테스트
+        private void TestInsPath_Click(object sender, RoutedEventArgs e)
         {
-            // 테스트 데이터 생성
-            var sensorData = GenerateTestSensorData(50); // 50개 데이터 포인트
-            var startPoint = new PointLatLng(34.61013470769485, 127.20767755769276); // 시작 위치
+            var sensorData = GenerateTestSensorData(50);
+            var startPoint = new PointLatLng(34.61013470769485, 127.20767755769276);
 
-            // 경로 계산
-            var path = inertialNav.CalculatePath(sensorData, startPoint);
+            insPathPoints = inertialNav.CalculatePath(sensorData, startPoint);
 
-            // 지도에 경로 표시
-            if (path.Count > 1)
-            {
-                var route = new GMapRoute(path);
-                route.Shape = new System.Windows.Shapes.Path
-                {
-                    Stroke = System.Windows.Media.Brushes.Red,
-                    StrokeThickness = 2
-                };
-                mapControl.Markers.Clear();
-                mapControl.Markers.Add(route);
-                //mapControl.ZoomAndCenterMarkers(null); // 경로에 맞게 줌 조정
-            }
+            mapControl.Markers.Clear();
+            UpdatePath(insPathPoints, System.Windows.Media.Brushes.Red, "INS Path");
+         
         }
-        // 테스트 데이터 생성 메서드
+
+        // GPS 경로 테스트
+        private void TestGpsPath_Click(object sender, RoutedEventArgs e)
+        {
+            gpsPathPoints = GenerateTestGpsPath(50, new PointLatLng(34.61013470769485, 127.20767755769276));
+
+            mapControl.Markers.Clear();
+            UpdatePath(gpsPathPoints, System.Windows.Media.Brushes.Blue, "GPS Path");
+            
+        }
+
+        // 두 경로 모두 테스트
+        private void TestBothPaths_Click(object sender, RoutedEventArgs e)
+        {
+            var sensorData = GenerateTestSensorData(50);
+            var startPoint = new PointLatLng(34.61013470769485, 127.20767755769276);
+
+            insPathPoints = inertialNav.CalculatePath(sensorData, startPoint);
+            gpsPathPoints = GenerateTestGpsPath(50, startPoint);
+
+            mapControl.Markers.Clear();
+            UpdatePath(insPathPoints, System.Windows.Media.Brushes.Red, "INS Path");
+            UpdatePath(gpsPathPoints, System.Windows.Media.Brushes.Blue, "GPS Path");
+            mapControl.ZoomAndCenterMarkers(null);
+        }
+
+        // 관성항법 테스트 데이터 생성
         private List<SensorData> GenerateTestSensorData(int count)
         {
-            // 위에서 정의한 메서드 삽입
             var dataList = new List<SensorData>();
             Random rand = new Random();
+            double accelX = 0.1; // 초기 X축 가속
+            double accelY = 0.0; // 초기 Y축 가속
+            double gyroZ = 0.02; // Z축 회전 (요)
+
             for (int i = 0; i < count; i++)
             {
+                // 간단한 시나리오: X축 가속 후 Y축으로 방향 전환
+                if (i > count / 2)
+                {
+                    accelX -= 0.002; // X축 가속 감소
+                    accelY += 0.002; // Y축 가속 증가
+                    gyroZ = 0.01;    // 방향 전환
+                }
+
                 dataList.Add(new SensorData
                 {
-                    AccelX = rand.NextDouble() * 0.2 - 0.1,
-                    AccelY = rand.NextDouble() * 0.2 - 0.1,
-                    AccelZ = rand.NextDouble() * 0.2 - 0.1,
-                    GyroX = rand.NextDouble() * 0.02 - 0.01,
-                    GyroY = rand.NextDouble() * 0.02 - 0.01,
-                    GyroZ = rand.NextDouble() * 0.02 - 0.01,
-                    DeltaTime = 0.1
+                    AccelX = accelX + (rand.NextDouble() * 0.02 - 0.01), // 노이즈 추가
+                    AccelY = accelY + (rand.NextDouble() * 0.02 - 0.01),
+                    AccelZ = rand.NextDouble() * 0.02 - 0.01,
+                    GyroX = rand.NextDouble() * 0.002 - 0.001,
+                    GyroY = rand.NextDouble() * 0.002 - 0.001,
+                    GyroZ = gyroZ + (rand.NextDouble() * 0.002 - 0.001),
+                    DeltaTime = 1.0
                 });
             }
             return dataList;
+        }
+
+        // GPS 테스트 데이터 생성
+        private List<PointLatLng> GenerateTestGpsPath(int count, PointLatLng startPoint)
+        {
+            var path = new List<PointLatLng> { startPoint };
+            Random rand = new Random();
+            double currentLat = startPoint.Lat;
+            double currentLng = startPoint.Lng;
+
+            for (int i = 0; i < count - 1; i++)
+            {
+                // 간단한 시나리오: 북동쪽으로 이동 후 남동쪽으로 방향 전환
+                double deltaLat = (i < count / 2 ? 0.0001 : 0.00005) + (rand.NextDouble() * 0.00002 - 0.00001);
+                double deltaLng = (i < count / 2 ? 0.0001 : 0.00015) + (rand.NextDouble() * 0.00002 - 0.00001);
+
+                currentLat += deltaLat;
+                currentLng += deltaLng;
+                path.Add(new PointLatLng(currentLat, currentLng));
+            }
+            return path;
         }
     }
 }
