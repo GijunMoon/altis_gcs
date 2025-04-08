@@ -3,112 +3,88 @@ using System.IO.Ports;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
 using System.Buffers;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using altis_gcs;
 
 namespace altis_gcs
 {
     public class SerialCommunication : IDisposable
     {
-        private SerialPort _serialPort;
-        private readonly string _portName;
-        private readonly int _baudRate;
-        private readonly int _dataBits;
-        private readonly Parity _parity;
-        private readonly StopBits _stopBits;
+        private SerialPort serialPort;
+        private readonly Pipe pipe = new Pipe();
+        private bool isRunning;
+        private CancellationTokenSource cts;
+        private ParameterSettings parameterSettings;
 
         public event EventHandler<string> DataReceived;
-        public event EventHandler<TelemetryData> TelemetryDataParsed; // 파싱된 데이터 이벤트
-        public bool IsConnected { get; private set; } = false;
+        public event EventHandler<TelemetryData> TelemetryDataParsed;
 
-        private readonly Pipe _pipe;
-        private bool _isRunning;
-        private CancellationTokenSource _cts;
-        private readonly List<TelemetryData> _telemetryDataList = new List<TelemetryData>(); // 데이터 저장
-        private ParameterSettings _parameterSettings; // 파라미터 설정
+        public bool IsConnected { get; private set; } = false;
 
         public SerialCommunication(string portName, int baudRate, int dataBits = 8, Parity parity = Parity.None, StopBits stopBits = StopBits.One)
         {
-            _portName = portName;
-            _baudRate = baudRate;
-            _dataBits = dataBits;
-            _parity = parity;
-            _stopBits = stopBits;
-
-            _serialPort = new SerialPort(_portName, _baudRate, _parity, _dataBits, _stopBits)
+            serialPort = new SerialPort(portName, baudRate, parity, dataBits, stopBits)
             {
                 ReadTimeout = 500,
                 WriteTimeout = 500
             };
-            _pipe = new Pipe();
-            _isRunning = false;
-            _cts = new CancellationTokenSource();
-            _parameterSettings = new ParameterSettings(); // 기본 설정 초기화
+            cts = new CancellationTokenSource();
+            parameterSettings = new ParameterSettings();
         }
 
         public void SetParameterSettings(ParameterSettings settings)
         {
-            _parameterSettings = settings;
-        }
-
-        public List<TelemetryData> GetTelemetryData()
-        {
-            return _telemetryDataList;
+            parameterSettings = settings;
         }
 
         public void Connect()
         {
             try
             {
-                if (!_serialPort.IsOpen)
+                if (!serialPort.IsOpen)
                 {
-                    _serialPort.Open();
+                    serialPort.Open();
                     IsConnected = true;
-                    _isRunning = true;
-                    Task.Run(() => ReadSerialPortAsync(_cts.Token));
+                    isRunning = true;
+                    Task.Run(() => ReadSerialPortAsync(cts.Token));
+                    DataReceived?.Invoke(this, $"Connected to {serialPort.PortName}");
                 }
-                DataReceived?.Invoke(this, $"Connected to {_portName}");
             }
             catch (Exception ex)
             {
                 IsConnected = false;
-                DataReceived?.Invoke(this, $"포트 에러 발생: {ex.Message}");
+                DataReceived?.Invoke(this, ex.Message);
             }
         }
 
         public void Disconnect()
         {
-            if (_serialPort != null && _serialPort.IsOpen)
+            if (serialPort != null && serialPort.IsOpen)
             {
-                _isRunning = false;
-                _cts.Cancel();
-                _serialPort.Close();
+                isRunning = false;
+                cts.Cancel();
+                serialPort.Close();
                 IsConnected = false;
                 DataReceived?.Invoke(this, "Disconnected");
             }
         }
 
-        public void Send(string message)
-        {
-            if (_serialPort != null && _serialPort.IsOpen)
-            {
-                _serialPort.WriteLine(message);
-            }
-        }
-
         private async Task ReadSerialPortAsync(CancellationToken cancellationToken)
         {
-            PipeWriter writer = _pipe.Writer;
-            byte[] buffer = new byte[1024];
+            var writer = pipe.Writer;
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096); // 4KB 버퍼 사용
+
 
             try
             {
-                while (_isRunning && !cancellationToken.IsCancellationRequested)
+                while (isRunning && !cancellationToken.IsCancellationRequested)
                 {
-                    int bytesRead = await Task.Run(() => _serialPort.Read(buffer, 0, buffer.Length), cancellationToken);
+                    int bytesRead = await Task.Run(() => serialPort.Read(buffer, 0, buffer.Length), cancellationToken);
                     if (bytesRead > 0)
                     {
+                        ProcessBinaryPacket(buffer.AsSpan(0, bytesRead));
                         await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
                     }
                 }
@@ -119,34 +95,93 @@ namespace altis_gcs
             }
             finally
             {
+                ArrayPool<byte>.Shared.Return(buffer);
                 await writer.CompleteAsync();
             }
         }
 
+        private unsafe void ProcessBinaryPacket(Span<byte> data)
+        {
+            if (parameterSettings.ParameterCount == 0) return;
+
+            fixed (byte* ptr = data)
+            {
+                var packet = *(TelemetryPacket*)ptr; // 바이너리 데이터를 구조체로 매핑
+                var telemetryData = new TelemetryData();
+
+                for (int i = 0; i < parameterSettings.ParameterCount; i++)
+                {
+                    string paramName = parameterSettings.ParameterOrder[i];
+                    double value = GetSensorValue(packet, paramName);
+                    telemetryData.Parameters[paramName] = value;
+                }
+
+                telemetryData.Timestamp = DateTime.Now; // 현재 시간을 타임스탬프로 설정
+                TelemetryDataParsed?.Invoke(this, telemetryData);
+            }
+        }
+
+        private double GetSensorValue(TelemetryPacket packet, string paramName)
+        {
+            return paramName switch
+            {
+                "AccelX" => packet.AccelX,
+                "AccelY" => packet.AccelY,
+                "AccelZ" => packet.AccelZ,
+                "GyroX" => packet.GyroX,
+                "GyroY" => packet.GyroY,
+                "GyroZ" => packet.GyroZ,
+                _ => throw new ArgumentException($"Invalid parameter: {paramName}")
+            };
+        }
+
+        public void Dispose()
+        {
+            Disconnect();
+            serialPort?.Dispose();
+            cts?.Dispose();
+        }
+
+        public void Send(string message)
+        {
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.WriteLine(message);
+            }
+        }
+
+        // 2. ProcessLinesAsync 메서드 수정
         public async Task ProcessLinesAsync(CancellationToken cancellationToken)
         {
-            PipeReader reader = _pipe.Reader;
-
+            PipeReader reader = pipe.Reader;
             while (!cancellationToken.IsCancellationRequested)
             {
                 ReadResult result = await reader.ReadAsync(cancellationToken);
                 ReadOnlySequence<byte> buffer = result.Buffer;
-                SequencePosition? position;
 
-                while ((position = buffer.PositionOf((byte)'\n')) != null)
+                while (TryReadLine(ref buffer, out ReadOnlySequence<byte> line))
                 {
-                    var line = buffer.Slice(0, position.Value);
                     ProcessLine(line);
-                    buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
                 }
 
                 reader.AdvanceTo(buffer.Start, buffer.End);
+                if (result.IsCompleted) break;
+            }
+            await reader.CompleteAsync();
+        }
 
-                if (result.IsCompleted)
-                    break;
+        private bool TryReadLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> line)
+        {
+            SequencePosition? position = buffer.PositionOf((byte)'\n');
+            if (!position.HasValue)
+            {
+                line = default;
+                return false;
             }
 
-            await reader.CompleteAsync();
+            line = buffer.Slice(0, position.Value);
+            buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
+            return true;
         }
 
         private void ProcessLine(ReadOnlySequence<byte> line)
@@ -154,35 +189,42 @@ namespace altis_gcs
             string lineStr = System.Text.Encoding.UTF8.GetString(line.ToArray());
             DataReceived?.Invoke(this, lineStr);
 
-            // CSV 파싱
+            // CSV 파싱 로직
             string[] values = lineStr.Split(',');
-            if (_parameterSettings.ParameterCount == 0 || values.Length < _parameterSettings.ParameterCount)
+
+            if (parameterSettings.ParameterCount == 0 ||
+                values.Length != parameterSettings.ParameterCount)
             {
                 DataReceived?.Invoke(this, $"Invalid data format: {lineStr}");
                 return;
             }
 
-            // 설정된 파라미터 순서에 따라 데이터 매핑
             var telemetryData = new TelemetryData();
-            for (int i = 0; i < _parameterSettings.ParameterCount; i++)
+            for (int i = 0; i < parameterSettings.ParameterCount; i++)
             {
                 if (double.TryParse(values[i], out double value))
                 {
-                    string paramName = _parameterSettings.ParameterOrder[i];
+                    string paramName = parameterSettings.ParameterOrder[i];
                     telemetryData.Parameters[paramName] = value;
                 }
             }
 
-            // 데이터 저장
-            _telemetryDataList.Add(telemetryData);
             TelemetryDataParsed?.Invoke(this, telemetryData);
         }
 
-        public void Dispose()
-        {
-            Disconnect();
-            _serialPort?.Dispose();
-            _cts?.Dispose();
-        }
+    }
+
+
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct TelemetryPacket
+    {
+        public long Timestamp; // 타임스탬프
+        public double AccelX;
+        public double AccelY;
+        public double AccelZ;
+        public double GyroX;
+        public double GyroY;
+        public double GyroZ;
     }
 }
