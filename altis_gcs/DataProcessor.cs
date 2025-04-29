@@ -7,6 +7,9 @@ using OxyPlot;
 
 namespace altis_gcs
 {
+    /// <summary>
+    /// CSV 데이터를 비동기적으로 로드하고 처리하는 클래스
+    /// </summary>
     public class DataProcessor
     {
         public async Task<(List<DataPoint> accelX, List<DataPoint> accelY, List<DataPoint> accelZ,

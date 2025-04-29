@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -22,10 +23,23 @@ namespace altis_gcs
         private readonly ModelManager _modelManager;
         private readonly MapController _mapController;
         private readonly TimerManager _timerManager;
-        private readonly Navigation _calculator; //비행 경로 연산기 
 
+
+        /* 그래프 vars */
         public PlotModel CombinedAccelerationPlotModel { get; private set; } = new PlotModel { Title = "가속도 그래프" };
         public PlotModel GyroPlotModel { get; private set; } = new PlotModel { Title = "자이로 그래프" };
+
+        private readonly ObservableCollection<DataPoint> _accelXPoints = new ObservableCollection<DataPoint>();
+        private readonly ObservableCollection<DataPoint> _accelYPoints = new ObservableCollection<DataPoint>();
+        private readonly ObservableCollection<DataPoint> _accelZPoints = new ObservableCollection<DataPoint>();
+        private readonly ObservableCollection<DataPoint> _gyroXPoints = new ObservableCollection<DataPoint>();
+        private readonly ObservableCollection<DataPoint> _gyroYPoints = new ObservableCollection<DataPoint>();
+        private readonly ObservableCollection<DataPoint> _gyroZPoints = new ObservableCollection<DataPoint>();
+
+        private double _timeCounter = 0;
+        private readonly int _maxPoints = 100; // 표시할 최대 데이터 포인트 수
+
+        /*----------------------------------------------------------------------------------------------*/
 
         public MainWindow()
         {
@@ -36,13 +50,27 @@ namespace altis_gcs
             //_serialComm.DataReceived += (s, data) => SystemLogs.Items.Add("Received: " + data);
 
             _dataProcessor = new DataProcessor();
-            _modelManager = new ModelManager(ModelVisual, "C:/Users/문기준/source/repos/altis_gcs/altis_gcs/Models/rocket.obj");
+            _modelManager = new ModelManager(ModelVisual);
             _mapController = new MapController(mapControl);
             _timerManager = new TimerManager();
             _timerManager.ElapsedTimeUpdated += (s, elapsed) => TimerDisplay.Text = elapsed.ToString(@"mm\:ss");
             _dataProcessingCts = new CancellationTokenSource();
 
             RefreshPorts();
+
+            // 그래프 모델 초기화
+            CombinedAccelerationPlotModel = new PlotModel { Title = "가속도 그래프" };
+            CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel X", ItemsSource = _accelXPoints });
+            CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel Y", ItemsSource = _accelYPoints });
+            CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel Z", ItemsSource = _accelZPoints });
+
+            GyroPlotModel = new PlotModel { Title = "자이로 그래프" };
+            GyroPlotModel.Series.Add(new LineSeries { Title = "Gyro X", ItemsSource = _gyroXPoints });
+            GyroPlotModel.Series.Add(new LineSeries { Title = "Gyro Y", ItemsSource = _gyroYPoints });
+            GyroPlotModel.Series.Add(new LineSeries { Title = "Gyro Z", ItemsSource = _gyroZPoints });
+
+            Acceleration.Model = CombinedAccelerationPlotModel;
+            Gyro.Model = GyroPlotModel;
         }
 
         private void RefreshPorts()
@@ -56,9 +84,7 @@ namespace altis_gcs
 
         private void Connect_Click(object sender, RoutedEventArgs e)
         {
-            if (PortComboBox.SelectedItem == null || BaudRateComboBox.SelectedItem == null ||
-                DataBitsComboBox.SelectedItem == null || ParityComboBox.SelectedItem == null ||
-                StopBitsComboBox.SelectedItem == null)
+            if (PortComboBox.SelectedItem == null || BaudRateComboBox.SelectedItem == null)
             {
                 MessageBox.Show("모든 설정 값을 선택하세요!");
                 return;
@@ -68,11 +94,13 @@ namespace altis_gcs
             {
                 string portName = PortComboBox.SelectedItem.ToString();
                 int baudRate = int.Parse(((ComboBoxItem)BaudRateComboBox.SelectedItem).Content.ToString());
-                int dataBits = int.Parse(((ComboBoxItem)DataBitsComboBox.SelectedItem).Content.ToString());
-                Parity parity = (Parity)Enum.Parse(typeof(Parity), ((ComboBoxItem)ParityComboBox.SelectedItem).Content.ToString());
-                StopBits stopBits = (StopBits)Enum.Parse(typeof(StopBits), ((ComboBoxItem)StopBitsComboBox.SelectedItem).Content.ToString());
 
-                _serialComm = new SerialCommunication(portName, baudRate, dataBits, parity, stopBits);
+                //Need to Del
+                //int dataBits = int.Parse(((ComboBoxItem)DataBitsComboBox.SelectedItem).Content.ToString());
+                //Parity parity = (Parity)Enum.Parse(typeof(Parity), ((ComboBoxItem)ParityComboBox.SelectedItem).Content.ToString());
+                //StopBits stopBits = (StopBits)Enum.Parse(typeof(StopBits), ((ComboBoxItem)StopBitsComboBox.SelectedItem).Content.ToString());
+
+                _serialComm = new SerialCommunication(portName, baudRate);
                 _serialComm.DataReceived += (s, data) =>
                 {
                     Dispatcher.Invoke(() => SystemLogs.Items.Add(data));
@@ -86,6 +114,8 @@ namespace altis_gcs
                         if (data.Parameters.ContainsKey("Roll")) RollData.Text = data.Parameters["Roll"].ToString();
                         if (data.Parameters.ContainsKey("Pitch")) PitchData.Text = data.Parameters["Pitch"].ToString();
                         if (data.Parameters.ContainsKey("Yaw")) YawData.Text = data.Parameters["Yaw"].ToString();
+
+                        OnTelemetryDataParsed(sender, data); //바이너리 파싱
                     });
                 };
                 _serialComm.Connect();
@@ -158,6 +188,47 @@ namespace altis_gcs
             };
             _serialComm?.SetParameterSettings(settings);
             MessageBox.Show("파라미터 설정이 적용되었습니다.");
+        }
+
+        private void OnTelemetryDataParsed(object sender, TelemetryData data)
+        {
+            // UI 스레드에서 실행
+            Dispatcher.Invoke(() =>
+            {
+                // 데이터 포인트 추가
+                if (data.Parameters.TryGetValue("AccelX", out double accelX))
+                    AddDataPoint(_accelXPoints, _timeCounter, accelX);
+
+                if (data.Parameters.TryGetValue("AccelY", out double accelY))
+                    AddDataPoint(_accelYPoints, _timeCounter, accelY);
+
+                if (data.Parameters.TryGetValue("AccelZ", out double accelZ))
+                    AddDataPoint(_accelZPoints, _timeCounter, accelZ);
+
+                if (data.Parameters.TryGetValue("GyroX", out double gyroX))
+                    AddDataPoint(_gyroXPoints, _timeCounter, gyroX);
+
+                if (data.Parameters.TryGetValue("GyroY", out double gyroY))
+                    AddDataPoint(_gyroYPoints, _timeCounter, gyroY);
+
+                if (data.Parameters.TryGetValue("GyroZ", out double gyroZ))
+                    AddDataPoint(_gyroZPoints, _timeCounter, gyroZ);
+
+                _timeCounter += 0.1; // 시간 증가 (실제 시간 간격에 맞게 조정)
+
+                // 그래프 업데이트
+                CombinedAccelerationPlotModel.InvalidatePlot(true);
+                GyroPlotModel.InvalidatePlot(true);
+            });
+        }
+
+        private void AddDataPoint(ObservableCollection<DataPoint> points, double x, double y)
+        {
+            // 최대 포인트 수 제한
+            if (points.Count >= _maxPoints)
+                points.RemoveAt(0);
+
+            points.Add(new DataPoint(x, y));
         }
 
 
@@ -252,6 +323,7 @@ namespace altis_gcs
         private void Emergency_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("비상사출");
+            /* 시험 발사 이전까지 비상 사출 신호 전달 로직 반드시 구현할 것 ! */
         }
 
         // 포트 새로고침 버튼 클릭 이벤트

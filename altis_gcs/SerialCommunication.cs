@@ -5,8 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
-using altis_gcs;
 
 namespace altis_gcs
 {
@@ -23,9 +21,9 @@ namespace altis_gcs
 
         public bool IsConnected { get; private set; } = false;
 
-        public SerialCommunication(string portName, int baudRate, int dataBits = 8, Parity parity = Parity.None, StopBits stopBits = StopBits.One)
+        public SerialCommunication(string portName, int baudRate)
         {
-            serialPort = new SerialPort(portName, baudRate, parity, dataBits, stopBits)
+            serialPort = new SerialPort(portName, baudRate)
             {
                 ReadTimeout = 500,
                 WriteTimeout = 500
@@ -59,6 +57,21 @@ namespace altis_gcs
             }
         }
 
+        public void Dispose()
+        {
+            Disconnect();
+            serialPort?.Dispose();
+            cts?.Dispose();
+        }
+
+        public void Send(string message)
+        {
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.WriteLine(message);
+            }
+        }
+
         public void Disconnect()
         {
             if (serialPort != null && serialPort.IsOpen)
@@ -70,6 +83,8 @@ namespace altis_gcs
                 DataReceived?.Invoke(this, "Disconnected");
             }
         }
+
+        /* Binary 구역 */
 
         private async Task ReadSerialPortAsync(CancellationToken cancellationToken)
         {
@@ -111,7 +126,7 @@ namespace altis_gcs
 
                 for (int i = 0; i < parameterSettings.ParameterCount; i++)
                 {
-                    string paramName = parameterSettings.ParameterOrder[i];
+                    string paramName = parameterSettings.ParameterOrder[i]; //ui에서 넘겨받은 파라미터 순서 참조하면서 매핑
                     double value = GetSensorValue(packet, paramName);
                     telemetryData.Parameters[paramName] = value;
                 }
@@ -135,22 +150,8 @@ namespace altis_gcs
             };
         }
 
-        public void Dispose()
-        {
-            Disconnect();
-            serialPort?.Dispose();
-            cts?.Dispose();
-        }
+        /* CSV 구역 */
 
-        public void Send(string message)
-        {
-            if (serialPort != null && serialPort.IsOpen)
-            {
-                serialPort.WriteLine(message);
-            }
-        }
-
-        // 2. ProcessLinesAsync 메서드 수정
         public async Task ProcessLinesAsync(CancellationToken cancellationToken)
         {
             PipeReader reader = pipe.Reader;
@@ -227,4 +228,6 @@ namespace altis_gcs
         public double GyroY;
         public double GyroZ;
     }
+
+    // ToDo - 파일 저장으로 넘기는 로직 구현
 }
