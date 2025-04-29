@@ -6,6 +6,6 @@ namespace altis_gcs
     {
         public List<string> ParameterOrder { get; set; } = new List<string>();
 
-        public int ParameterCount => ParameterOrder.Count;
+        public int ParameterCount => ParameterOrder.Count; // 파라미터 개수 반환
     }
 }
