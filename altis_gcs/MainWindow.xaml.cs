@@ -40,6 +40,9 @@ namespace altis_gcs
         private double _timeCounter = 0;
         private readonly int _maxPoints = 100; // 표시할 최대 데이터 포인트 수
 
+        private readonly List<TelemetryData> _flightDataLog = new List<TelemetryData>(); //데이터 저장용
+
+
         /*----------------------------------------------------------------------------------------------*/
 
         public MainWindow()
@@ -253,6 +256,9 @@ namespace altis_gcs
                 // 그래프 업데이트
                 CombinedAccelerationPlotModel.InvalidatePlot(true);
                 GyroPlotModel.InvalidatePlot(true);
+
+                // 비행 데이터 저장
+                _flightDataLog.Add(data);
             });
         }
 
@@ -278,9 +284,16 @@ namespace altis_gcs
             {
                 List<string> data = new List<string>
                 {
-                    "Time,Altitude,Velocity,Latitude,Longitude"
+                    "Time,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ"
                 };
                 /*비행데이터 컨트롤 로직 작성*/
+                foreach(var telemetryData in _flightDataLog)
+                {
+                    string line = $"{telemetryData.Timestamp},{telemetryData.Parameters["AccelX"]},{telemetryData.Parameters["AccelY"]}," +
+                                  $"{telemetryData.Parameters["AccelZ"]},{telemetryData.Parameters["GyroX"]},{telemetryData.Parameters["GyroY"]}," +
+                                  $"{telemetryData.Parameters["GyroZ"]}";
+                    data.Add(line);
+                }
                 File.WriteAllLines(saveFileDialog.FileName, data);
             }
         }
