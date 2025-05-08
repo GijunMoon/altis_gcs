@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -71,6 +72,7 @@ namespace altis_gcs
 
             Acceleration.Model = CombinedAccelerationPlotModel;
             Gyro.Model = GyroPlotModel;
+
         }
 
         private void RefreshPorts()
@@ -92,6 +94,7 @@ namespace altis_gcs
 
             try
             {
+                Debug.WriteLine("Connecting to port...");
                 string portName = PortComboBox.SelectedItem.ToString();
                 int baudRate = int.Parse(((ComboBoxItem)BaudRateComboBox.SelectedItem).Content.ToString());
 
@@ -114,6 +117,7 @@ namespace altis_gcs
                         if (data.Parameters.ContainsKey("Roll")) RollData.Text = data.Parameters["Roll"].ToString();
                         if (data.Parameters.ContainsKey("Pitch")) PitchData.Text = data.Parameters["Pitch"].ToString();
                         if (data.Parameters.ContainsKey("Yaw")) YawData.Text = data.Parameters["Yaw"].ToString();
+
 
                         OnTelemetryDataParsed(sender, data); //바이너리 파싱
                     });
@@ -190,11 +194,41 @@ namespace altis_gcs
             MessageBox.Show("파라미터 설정이 적용되었습니다.");
         }
 
+        private double _prevYaw = 0.0;
+        private double _prevTime = 0.0; // 시간 누적 (초 단위)
+        private double _currentYaw = 0.0;
+
         private void OnTelemetryDataParsed(object sender, TelemetryData data)
         {
+            this.DataLabel.Visibility = Visibility.Hidden; //안내 레이블 숨김
+
             // UI 스레드에서 실행
             Dispatcher.Invoke(() =>
             {
+                // 시간 계산 (예: 0.1초 간격)
+                double deltaTime = 0.1;
+                _prevTime += deltaTime;
+
+                // 가속도/자이로 값 추출
+                double ax = data.Parameters.TryGetValue("AccelX", out var v1) ? v1 : 0;
+                double ay = data.Parameters.TryGetValue("AccelY", out var v2) ? v2 : 0;
+                double az = data.Parameters.TryGetValue("AccelZ", out var v3) ? v3 : 0;
+                double gz = data.Parameters.TryGetValue("GyroZ", out var v4) ? v4 : 0;
+
+                // Pitch, Roll 계산 (라디안 → 도)
+                double pitch = Math.Atan2(-ax, Math.Sqrt(ay * ay + az * az)) * 180.0 / Math.PI;
+                double roll = Math.Atan2(ay, az) * 180.0 / Math.PI;
+
+                // Yaw 계산 (적분)
+                _currentYaw += gz * deltaTime; // GyroZ는 rad/s 또는 deg/s 단위, 센서에 맞게 보정 필요
+
+                // UI 표시
+                RollData.Text = roll.ToString("F2");
+                PitchData.Text = pitch.ToString("F2");
+                YawData.Text = _currentYaw.ToString("F2");
+
+                _modelManager.UpdateTransform(roll, pitch, _currentYaw);
+
                 // 데이터 포인트 추가
                 if (data.Parameters.TryGetValue("AccelX", out double accelX))
                     AddDataPoint(_accelXPoints, _timeCounter, accelX);
@@ -276,26 +310,11 @@ namespace altis_gcs
 
                 Acceleration.Model = CombinedAccelerationPlotModel;
                 Gyro.Model = GyroPlotModel;
+
             }
         }
 
-        private void RollSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            RollData.Text = $"{e.NewValue}°";
-            _modelManager.UpdateTransform(RollSlider.Value, PitchSlider.Value, YawSlider.Value);
-        }
-
-        private void PitchSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            PitchData.Text = $"{e.NewValue}°";
-            _modelManager.UpdateTransform(RollSlider.Value, PitchSlider.Value, YawSlider.Value);
-        }
-
-        private void YawSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            YawData.Text = $"{e.NewValue}°";
-            _modelManager.UpdateTransform(RollSlider.Value, PitchSlider.Value, YawSlider.Value);
-        }
+        /*레거시 삭제됨*/
 
         private void StartLaunch_Click(object sender, RoutedEventArgs e)
         {
@@ -356,29 +375,7 @@ namespace altis_gcs
             }
         }*/
 
-        // 위도 슬라이더 값 변경 이벤트
-        private void LatSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            LatData.Text = $"{e.NewValue:F4}";
-        }
-
-        // 경도 슬라이더 값 변경 이벤트
-        private void LongSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            LongData.Text = $"{e.NewValue:F4}";
-        }
-
-        // 데이터 초기화 버튼 클릭 이벤트
-        private void ResetData_Click(object sender, RoutedEventArgs e)
-        {
-            RollSlider.Value = -90;
-            PitchSlider.Value = 0;
-            YawSlider.Value = 0;
-            LatSlider.Value = 0;
-            LongSlider.Value = 0;
-            _modelManager.UpdateTransform(RollSlider.Value, PitchSlider.Value, YawSlider.Value);
-            RollSlider.Value = 0;
-        }
+        // 위도 슬라이더 값 변경 이벤트. 레거시 삭제됨
 
         private void ShowPath_Click(object sender, RoutedEventArgs e)
         {

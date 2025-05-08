@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Runtime.InteropServices;
+using altis_gcs; // ParameterSettings, TelemetryData 등 별도 파일 참조
 
 namespace altis_gcs
 {
@@ -21,9 +22,9 @@ namespace altis_gcs
 
         public bool IsConnected { get; private set; } = false;
 
-        public SerialCommunication(string portName, int baudRate)
+        public SerialCommunication(string portName, int baudRate, int dataBits = 8, Parity parity = Parity.None, StopBits stopBits = StopBits.One)
         {
-            serialPort = new SerialPort(portName, baudRate)
+            serialPort = new SerialPort(portName, baudRate, parity, dataBits, stopBits)
             {
                 ReadTimeout = 500,
                 WriteTimeout = 500
@@ -50,10 +51,15 @@ namespace altis_gcs
                     DataReceived?.Invoke(this, $"Connected to {serialPort.PortName}");
                 }
             }
+            catch (TimeoutException ex)
+            {
+                IsConnected = false;
+                DataReceived?.Invoke(this, $"Timeout: {ex.Message}");
+            }
             catch (Exception ex)
             {
                 IsConnected = false;
-                DataReceived?.Invoke(this, ex.Message);
+                DataReceived?.Invoke(this, $"Connection error: {ex.Message}");
             }
         }
 
@@ -66,9 +72,20 @@ namespace altis_gcs
 
         public void Send(string message)
         {
-            if (serialPort != null && serialPort.IsOpen)
+            try
             {
-                serialPort.WriteLine(message);
+                if (serialPort != null && serialPort.IsOpen)
+                {
+                    serialPort.WriteLine(message);
+                }
+            }
+            catch (TimeoutException ex)
+            {
+                DataReceived?.Invoke(this, $"Send timeout: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                DataReceived?.Invoke(this, $"Send error: {ex.Message}");
             }
         }
 
@@ -84,23 +101,32 @@ namespace altis_gcs
             }
         }
 
-        /* Binary 구역 */
-
+        // Binary packet processing
         private async Task ReadSerialPortAsync(CancellationToken cancellationToken)
         {
             var writer = pipe.Writer;
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096); // 4KB 버퍼 사용
-
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096);
 
             try
             {
                 while (isRunning && !cancellationToken.IsCancellationRequested)
                 {
-                    int bytesRead = await Task.Run(() => serialPort.Read(buffer, 0, buffer.Length), cancellationToken);
+                    int bytesRead = 0;
+                    try
+                    {
+                        bytesRead = await Task.Run(() => serialPort.Read(buffer, 0, buffer.Length), cancellationToken);
+                    }
+                    catch (TimeoutException)
+                    {
+                        // Timeout은 빈번히 발생할 수 있으므로 무시하고 루프를 계속 진행
+                        continue;
+                    }
+
                     if (bytesRead > 0)
                     {
-                        ProcessBinaryPacket(buffer.AsSpan(0, bytesRead));
-                        await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
+                        //ProcessBinaryPacket(buffer.AsSpan(0, bytesRead));
+                        //await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
+                        ProcessBinaryPacket(buffer.AsSpan(0, 56));
                     }
                 }
             }
@@ -113,25 +139,27 @@ namespace altis_gcs
                 ArrayPool<byte>.Shared.Return(buffer);
                 await writer.CompleteAsync();
             }
+
         }
 
         private unsafe void ProcessBinaryPacket(Span<byte> data)
         {
             if (parameterSettings.ParameterCount == 0) return;
+            if (data.Length < sizeof(TelemetryPacket)) return;
 
             fixed (byte* ptr = data)
             {
-                var packet = *(TelemetryPacket*)ptr; // 바이너리 데이터를 구조체로 매핑
+                var packet = *(TelemetryPacket*)ptr;
                 var telemetryData = new TelemetryData();
 
                 for (int i = 0; i < parameterSettings.ParameterCount; i++)
                 {
-                    string paramName = parameterSettings.ParameterOrder[i]; //ui에서 넘겨받은 파라미터 순서 참조하면서 매핑
+                    string paramName = parameterSettings.ParameterOrder[i];
                     double value = GetSensorValue(packet, paramName);
                     telemetryData.Parameters[paramName] = value;
                 }
 
-                telemetryData.Timestamp = DateTime.Now; // 현재 시간을 타임스탬프로 설정
+                telemetryData.Timestamp = DateTime.Now;
                 TelemetryDataParsed?.Invoke(this, telemetryData);
             }
         }
@@ -150,8 +178,7 @@ namespace altis_gcs
             };
         }
 
-        /* CSV 구역 */
-
+        // CSV packet processing
         public async Task ProcessLinesAsync(CancellationToken cancellationToken)
         {
             PipeReader reader = pipe.Reader;
@@ -190,7 +217,6 @@ namespace altis_gcs
             string lineStr = System.Text.Encoding.UTF8.GetString(line.ToArray());
             DataReceived?.Invoke(this, lineStr);
 
-            // CSV 파싱 로직
             string[] values = lineStr.Split(',');
 
             if (parameterSettings.ParameterCount == 0 ||
@@ -212,15 +238,12 @@ namespace altis_gcs
 
             TelemetryDataParsed?.Invoke(this, telemetryData);
         }
-
     }
-
-
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TelemetryPacket
     {
-        public long Timestamp; // 타임스탬프
+        public long Timestamp;
         public double AccelX;
         public double AccelY;
         public double AccelZ;
@@ -228,6 +251,4 @@ namespace altis_gcs
         public double GyroY;
         public double GyroZ;
     }
-
-    // ToDo - 파일 저장으로 넘기는 로직 구현
 }
