@@ -124,9 +124,13 @@ namespace altis_gcs
 
                     if (bytesRead > 0)
                     {
-                        //ProcessBinaryPacket(buffer.AsSpan(0, bytesRead));
-                        //await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
-                        ProcessBinaryPacket(buffer.AsSpan(0, 56));
+                        if (parameterSettings.CommType == CommunicationType.Binary)
+                        {
+                            ProcessBinaryPacket(buffer.AsSpan(0, 56));
+                        } else
+                        {
+                            await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
+                        }
                     }
                 }
             }
