@@ -118,6 +118,14 @@
                     <Button Content="연결" Margin="5" Click="Connect_Click" Background="#FF9BE2FF"/>
                     <Button Content="연결 해제" Margin="5" Click="Disconnect_Click" Background="#FFFF9F9F"/>
 
+                    <!-- 통신 방식 설정 UI 추가 -->
+                    <TextBlock Text="통신 방식 설정" FontSize="16" FontWeight="Bold" Margin="5"/>
+                    <StackPanel Orientation="Horizontal" Margin="5">
+                        <RadioButton x:Name="PlainTextRadioButton" Content="Plain Text (CSV)" GroupName="CommType" IsChecked="True" VerticalAlignment="Center" Margin="5,0"/>
+                        <RadioButton x:Name="BinaryRadioButton" Content="Binary" GroupName="CommType" VerticalAlignment="Center" Margin="5,0"/>
+                    </StackPanel>
+                    <Separator Margin="5"/>
+
                     <!-- 파라미터 설정 UI 추가 -->
                     <TextBlock Text="파라미터 파싱 규칙 설정" FontSize="16" FontWeight="Bold" Margin="5"/>
                     <StackPanel Orientation="Horizontal" Margin="5">
@@ -137,6 +145,76 @@
                         <gmap:GMapControl x:Name="mapControl" Zoom="13" MaxZoom="24" MinZoom="1"/>
                         <!--경로표현window와 병합-->
                     </GroupBox>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Ejection">
+                <Grid Background="Black">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- 타이틀 영역 -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- 행간 구분 -->
+                        <RowDefinition Height="Auto"/>
+
+                        <RowDefinition Height="Auto"/>
+
+                        <RowDefinition Height="Auto"/>
+
+                        <RowDefinition Height="Auto"/>
+                        
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 타이틀 영역 -->
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="사출 장치 관리" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               FontSize="24" FontWeight="Bold" Foreground="White" Margin="5"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Text="안전장치 인디케이터" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               FontSize="24" FontWeight="Bold" Foreground="White" Margin="5"/>
+                    
+                    <!-- 비상 사출 버튼 -->
+                    <Button Grid.Row="1" Grid.Column="0" Content="비 상 사 출" Click="Emergency_Click" Margin="0, 25"
+                            FontSize="18" FontWeight="Bold" Background="#FFCC0000" Foreground="White" Height="60"/>
+
+                    <!-- 사출 장치 1번 -->
+                    <Button Grid.Row="2" Grid.Column="0" Content="1번 서보" Click="Servo1_Click" Margin="0, 5"
+                            FontSize="18" FontWeight="Bold" Background="CadetBlue" Foreground="White" Height="60"/>
+                    <Ellipse x:Name="Servo1Indicator" Grid.Row="2" Grid.Column="2"
+                             Width="30" Height="30" Fill="Red" Stroke="Black" StrokeThickness="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                             Margin="0,0,0,0"/>
+
+                    <!-- 사출 장치 2번 -->
+                    <Button Grid.Row="3" Grid.Column="0" Content="2번 서보" Click="Servo2_Click" Margin="0, 5"
+                            FontSize="18" FontWeight="Bold" Background="CadetBlue" Foreground="White" Height="60"/>
+                    <Ellipse x:Name="Servo2Indicator" Grid.Row="3" Grid.Column="2"
+                             Width="30" Height="30" Fill="Red" Stroke="Black" StrokeThickness="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                             Margin="0,0,0,0"/>
+
+                    <!-- 사출 장치 3번 -->
+                    <Button Grid.Row="4" Grid.Column="0" Content="3번 서보" Click="Servo3_Click" Margin="0, 5"
+                            FontSize="18" FontWeight="Bold" Background="CadetBlue" Foreground="White" Height="60"/>
+                    <Ellipse x:Name="Servo3Indicator" Grid.Row="4" Grid.Column="2"
+                             Width="30" Height="30" Fill="Red" Stroke="Black" StrokeThickness="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                             Margin="0,0,0,0"/>
+
+                    <!-- 사출 장치 4번 -->
+                    <Button Grid.Row="5" Grid.Column="0" Content="4번 서보" Click="Servo4_Click" Margin="0, 5"
+                            FontSize="18" FontWeight="Bold" Background="CadetBlue" Foreground="White" Height="60"/>
+                    <Ellipse x:Name="Servo4Indicator" Grid.Row="5" Grid.Column="2"
+                             Width="30" Height="30" Fill="Red" Stroke="Black" StrokeThickness="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                             Margin="0,0,0,0"/>
+
+                    <!-- 사출 장치 5번 -->
+                    <Button Grid.Row="6" Grid.Column="0" Content="5번 서보" Click="Servo5_Click" Margin="0, 5"
+                            FontSize="18" FontWeight="Bold" Background="CadetBlue" Foreground="White" Height="60"/>
+                    <Ellipse x:Name="Servo5Indicator" Grid.Row="6" Grid.Column="2"
+                             Width="30" Height="30" Fill="Red" Stroke="Black" StrokeThickness="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                             Margin="0,0,0,0"/>
+
                 </Grid>
             </TabItem>
         </TabControl>

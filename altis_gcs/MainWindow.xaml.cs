@@ -9,6 +9,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using Microsoft.Win32;
 using OxyPlot;
 using OxyPlot.Series;
@@ -39,6 +41,9 @@ namespace altis_gcs
 
         private double _timeCounter = 0;
         private readonly int _maxPoints = 100; // 표시할 최대 데이터 포인트 수
+
+        private readonly List<TelemetryData> _flightDataLog = new List<TelemetryData>(); //데이터 저장용
+
 
         /*----------------------------------------------------------------------------------------------*/
 
@@ -98,12 +103,18 @@ namespace altis_gcs
                 string portName = PortComboBox.SelectedItem.ToString();
                 int baudRate = int.Parse(((ComboBoxItem)BaudRateComboBox.SelectedItem).Content.ToString());
 
-                //Need to Del
-                //int dataBits = int.Parse(((ComboBoxItem)DataBitsComboBox.SelectedItem).Content.ToString());
-                //Parity parity = (Parity)Enum.Parse(typeof(Parity), ((ComboBoxItem)ParityComboBox.SelectedItem).Content.ToString());
-                //StopBits stopBits = (StopBits)Enum.Parse(typeof(StopBits), ((ComboBoxItem)StopBitsComboBox.SelectedItem).Content.ToString());
-
                 _serialComm = new SerialCommunication(portName, baudRate);
+
+                var currentSettings = new ParameterSettings
+                {
+                    ParameterOrder = ParameterOrderTextBox.Text.Split(',').Select(p => p.Trim()).ToList(),
+                    CommType = (PlainTextRadioButton.IsChecked == true)
+                        ? CommunicationType.Text
+                        : CommunicationType.Binary
+                };
+                _serialComm.SetParameterSettings(currentSettings);
+
+                // 이벤트 핸들러
                 _serialComm.DataReceived += (s, data) =>
                 {
                     Dispatcher.Invoke(() => SystemLogs.Items.Add(data));
@@ -124,8 +135,10 @@ namespace altis_gcs
                 };
                 _serialComm.Connect();
 
-                // 데이터 파싱 태스크 시작
-                Task.Run(() => _serialComm.ProcessLinesAsync(_dataProcessingCts.Token));
+                if (currentSettings.CommType == CommunicationType.Text) {
+                    Task.Run(() => _serialComm.ProcessLinesAsync(_dataProcessingCts.Token)); // 텍스트 모드일 때만 데이터 파싱 태스크 시작
+                }
+
             }
             catch (Exception ex)
             {
@@ -188,7 +201,12 @@ namespace altis_gcs
 
             var settings = new ParameterSettings
             {
-                ParameterOrder = ParameterOrderTextBox.Text.Split(',').Select(p => p.Trim()).ToList()
+                ParameterOrder = ParameterOrderTextBox.Text.Split(',').Select(p => p.Trim()).ToList(),
+
+                            // UI의 라디오 버튼 선택에 따라 통신 방식 설정
+                CommType = (PlainTextRadioButton.IsChecked == true)
+                    ? CommunicationType.Text
+                    : CommunicationType.Binary
             };
             _serialComm?.SetParameterSettings(settings);
             MessageBox.Show("파라미터 설정이 적용되었습니다.");
@@ -253,6 +271,9 @@ namespace altis_gcs
                 // 그래프 업데이트
                 CombinedAccelerationPlotModel.InvalidatePlot(true);
                 GyroPlotModel.InvalidatePlot(true);
+
+                // 비행 데이터 저장
+                _flightDataLog.Add(data);
             });
         }
 
@@ -278,9 +299,16 @@ namespace altis_gcs
             {
                 List<string> data = new List<string>
                 {
-                    "Time,Altitude,Velocity,Latitude,Longitude"
+                    "Time,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ"
                 };
                 /*비행데이터 컨트롤 로직 작성*/
+                foreach(var telemetryData in _flightDataLog)
+                {
+                    string line = $"{telemetryData.Timestamp},{telemetryData.Parameters["AccelX"]},{telemetryData.Parameters["AccelY"]}," +
+                                  $"{telemetryData.Parameters["AccelZ"]},{telemetryData.Parameters["GyroX"]},{telemetryData.Parameters["GyroY"]}," +
+                                  $"{telemetryData.Parameters["GyroZ"]}";
+                    data.Add(line);
+                }
                 File.WriteAllLines(saveFileDialog.FileName, data);
             }
         }
@@ -338,11 +366,113 @@ namespace altis_gcs
             VelocityData.Text = $"{e.NewValue:0} m/s";
         }
 
+
+        /* 사 출 로 직 */
+
         // 비상 버튼 클릭 이벤트
         private void Emergency_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("비상사출");
             /* 시험 발사 이전까지 비상 사출 신호 전달 로직 반드시 구현할 것 ! */
+        }
+
+        private bool[] servoStates = new bool[5]; // 각 서보의 상태 저장
+
+        private void SetServoIndicator(int servoIndex, bool isActive)
+        {
+            // 각 Indicator 이름에 맞게 처리
+            Ellipse indicator = null;
+            switch (servoIndex)
+            {
+                case 0: indicator = Servo1Indicator; break;
+                case 1: indicator = Servo2Indicator; break;
+                case 2: indicator = Servo3Indicator; break;
+                case 3: indicator = Servo4Indicator; break;
+                case 4: indicator = Servo5Indicator; break;
+            }
+            if (indicator != null)
+                indicator.Fill = isActive ? Brushes.LimeGreen : Brushes.Red;
+        }
+
+        private void Servo1_Click(object sender, RoutedEventArgs e)
+        {
+            //테스트 위해 여기 위치함. 실제 적용 시 if문 내부로 넣을 것.
+            servoStates[0] = !servoStates[0]; // 토글(ON/OFF)
+            SetServoIndicator(0, servoStates[0]);
+
+            if (_serialComm != null && _serialComm.IsConnected)
+            {
+                _serialComm.Send("SERVO1");
+                SystemLogs.Items.Add("Servo 1 activated.");
+            }
+            else
+            {
+                MessageBox.Show("Not connected to any port.");
+            }
+        }
+
+        private void Servo2_Click(object sender, RoutedEventArgs e)
+        {
+            servoStates[1] = !servoStates[1]; // 토글(ON/OFF)
+            SetServoIndicator(1, servoStates[1]);
+
+            if (_serialComm != null && _serialComm.IsConnected)
+            {
+                _serialComm.Send("SERVO2");
+                SystemLogs.Items.Add("Servo 2 activated.");
+            }
+            else
+            {
+                MessageBox.Show("Not connected to any port.");
+            }
+        }
+
+        private void Servo3_Click(object sender, RoutedEventArgs e)
+        {
+            servoStates[2] = !servoStates[2];
+            SetServoIndicator(2, servoStates[2]);
+
+            if (_serialComm != null && _serialComm.IsConnected)
+            {
+                _serialComm.Send("SERVO3");
+                SystemLogs.Items.Add("Servo 3 activated.");
+            }
+            else
+            {
+                MessageBox.Show("Not connected to any port.");
+            }
+        }
+
+        private void Servo4_Click(object sender, RoutedEventArgs e)
+        {
+            servoStates[3] = !servoStates[3];
+            SetServoIndicator(3, servoStates[3]);
+
+            if (_serialComm != null && _serialComm.IsConnected)
+            {
+                _serialComm.Send("SERVO4");
+                SystemLogs.Items.Add("Servo 4 activated.");
+            }
+            else
+            {
+                MessageBox.Show("Not connected to any port.");
+            }
+        }
+
+        private void Servo5_Click(object sender, RoutedEventArgs e)
+        {
+            servoStates[4] = !servoStates[4];
+            SetServoIndicator(4, servoStates[4]);
+
+            if (_serialComm != null && _serialComm.IsConnected)
+            {
+                _serialComm.Send("SERVO5");
+                SystemLogs.Items.Add("Servo 5 activated.");
+            }
+            else
+            {
+                MessageBox.Show("Not connected to any port.");
+            }
         }
 
         // 포트 새로고침 버튼 클릭 이벤트
