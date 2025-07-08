@@ -5,7 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Runtime.InteropServices;
-using altis_gcs; // ParameterSettings, TelemetryData 등 별도 파일 참조
+using altis_gcs;
+using System.IO; // ParameterSettings, TelemetryData 등 별도 파일 참조
 
 namespace altis_gcs
 {
@@ -114,12 +115,16 @@ namespace altis_gcs
                     int bytesRead = 0;
                     try
                     {
-                        bytesRead = await Task.Run(() => serialPort.Read(buffer, 0, buffer.Length), cancellationToken);
+                        bytesRead = await serialPort.BaseStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                     }
-                    catch (TimeoutException)
+                    catch (IOException ex)
                     {
-                        // Timeout은 빈번히 발생할 수 있으므로 무시하고 루프를 계속 진행
-                        continue;
+                        DataReceived?.Invoke(this, $"비정상 IO 종료: {ex.Message}");
+                        continue; // ignore
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break; // 취소 요청 시 루프 종료
                     }
 
                     if (bytesRead > 0)
@@ -127,7 +132,8 @@ namespace altis_gcs
                         if (parameterSettings.CommType == CommunicationType.Binary)
                         {
                             ProcessBinaryPacket(buffer.AsSpan(0, 56));
-                        } else
+                        }
+                        else
                         {
                             await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
                         }
@@ -143,7 +149,6 @@ namespace altis_gcs
                 ArrayPool<byte>.Shared.Return(buffer);
                 await writer.CompleteAsync();
             }
-
         }
 
         private unsafe void ProcessBinaryPacket(Span<byte> data)

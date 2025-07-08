@@ -11,6 +11,7 @@ namespace altis_gcs
 
         public override string ToString()
         {
+            Timestamp = DateTime.Now; // 현재 시간으로 설정
             var paramStrings = string.Join(", ", Parameters.Select(p => $"{p.Key}: {p.Value}"));
             return $"{Timestamp}: {paramStrings}";
         }
