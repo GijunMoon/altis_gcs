@@ -89,17 +89,50 @@ namespace altis_gcs
 
         public void UpdateTransform(double roll, double pitch, double yaw)
         {
-            // 기존 회전 변환 로직 유지
-            var rollTransform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), roll));
-            var pitchTransform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), pitch));
-            var yawTransform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), yaw));
+            double rollRad = roll * (Math.PI / 180.0);
+            double pitchRad = pitch * (Math.PI / 180.0);
+            double yawRad = yaw * (Math.PI / 180.0);
 
+            // 각 축에 대한 쿼터니언 생성
+            Quaternion qRoll = new Quaternion(new Vector3D(1, 0, 0), roll); // Roll (X축)
+            Quaternion qPitch = new Quaternion(new Vector3D(0, 1, 0), pitch); // Pitch (Y축)
+            Quaternion qYaw = new Quaternion(new Vector3D(0, 0, 1), yaw); // Yaw (Z축)
+
+            // 쿼터니언 합성 (순서 중요: 일반적으로 Yaw -> Pitch -> Roll 순으로 곱함)
+            Quaternion combinedQuaternion = qYaw * qPitch * qRoll;
+
+            // 쿼터니언 회전 변환 생성
+            var quaternionRotation = new QuaternionRotation3D(combinedQuaternion);
+
+            // TransformGroup에 쿼터니언 회전 변환 추가
             var transformGroup = new Transform3DGroup();
-            transformGroup.Children.Add(yawTransform);
-            transformGroup.Children.Add(pitchTransform);
-            transformGroup.Children.Add(rollTransform);
+            transformGroup.Children.Add(new RotateTransform3D(quaternionRotation));
 
             modelVisual.Transform = transformGroup;
+        }
+
+        public void UpdateTransformWithQuaternion(double q_w, double q_x, double q_y, double q_z)
+        {
+            // 센서에서 받은 쿼터니언 (실수-허수 순서: w, x, y, z)을
+            // System.Windows.Media.Media3D.Quaternion 객체로 변환 (생성자 순서: x, y, z, w)
+            Quaternion orientationQuaternion = new Quaternion(q_x, q_y, q_z, q_w);
+
+            // 쿼터니언 회전 변환 생성
+            var quaternionRotation = new QuaternionRotation3D(orientationQuaternion);
+
+            // TransformGroup에 쿼터니언 회전 변환 추가
+            var transformGroup = new Transform3DGroup();
+            transformGroup.Children.Add(new RotateTransform3D(quaternionRotation));
+
+            // 모델에 변환 적용
+            if (modelVisual != null)
+            {
+                modelVisual.Transform = transformGroup;
+            }
+            else
+            {
+                Console.WriteLine("Warning: modelVisual is not initialized in ModelManager.");
+            }
         }
     }
 }
