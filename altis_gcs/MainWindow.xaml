@@ -130,7 +130,7 @@
                     <TextBlock Text="파라미터 파싱 규칙 설정" FontSize="16" FontWeight="Bold" Margin="5"/>
                     <StackPanel Orientation="Horizontal" Margin="5">
                         <TextBlock Text="Parameters:" Width="150" VerticalAlignment="Center"/>
-                        <TextBox x:Name="ParameterOrderTextBox" Width="369" Text="AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ" Height="20" />
+                        <TextBox x:Name="ParameterOrderTextBox" Width="369" Text="Time,Altitude,Velocity,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,QuaternionX,QuaternionY,QuaternionZ,QuaternionW, ftv_ej1, ftv_ej2, ftv_ej3" Height="20"/>
                     </StackPanel>
                     <Button Content="규칙 설정 적용" Margin="5" Click="ApplyParameterSettings_Click" Background="#FFFFA8A8"/>
                     <StackPanel Orientation="Horizontal" Margin="5"/>

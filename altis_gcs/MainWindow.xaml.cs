@@ -233,6 +233,12 @@ namespace altis_gcs
                 double az = data.Parameters.TryGetValue("AccelZ", out var v3) ? v3 : 0;
                 double gz = data.Parameters.TryGetValue("GyroZ", out var v4) ? v4 : 0;
 
+                double velocity = data.Parameters.TryGetValue("Velocity", out var v5) ? v5 : 0;
+                double altitude = data.Parameters.TryGetValue("Altitude", out var v6) ? v6 : 0;
+
+                double g = 9.81;
+                double G = Math.Sqrt(ax * ax + ay * ay + az * az) / g;
+
                 // Pitch, Roll 계산 (라디안 → 도)
                 double pitch = Math.Atan2(-ax, Math.Sqrt(ay * ay + az * az)) * 180.0 / Math.PI;
                 double roll = Math.Atan2(ay, az) * 180.0 / Math.PI;
@@ -244,6 +250,11 @@ namespace altis_gcs
                 RollData.Text = roll.ToString("F2");
                 PitchData.Text = pitch.ToString("F2");
                 YawData.Text = _currentYaw.ToString("F2");
+
+                VelocityData.Text = velocity.ToString("F2");
+                AltitudeData.Text = altitude.ToString("F2");
+
+                GData.Text = G.ToString("F2");
 
                 _modelManager.UpdateTransform(roll, pitch, _currentYaw);
 
@@ -324,7 +335,7 @@ namespace altis_gcs
             if (openFileDialog.ShowDialog() == true)
             {
                 this.DataLabel.Visibility = Visibility.Hidden;
-                var (accelX, accelY, accelZ, gyroX, gyroY, gyroZ) = await _dataProcessor.LoadCsvDataAsync(openFileDialog.FileName);
+                var (accelX, accelY, accelZ, gyroX, gyroY, gyroZ, quatX, quatY, quatZ, quatW, telemData) = await _dataProcessor.LoadCsvDataAsync(openFileDialog.FileName);
 
                 CombinedAccelerationPlotModel = new PlotModel { Title = "가속도 그래프" };
                 CombinedAccelerationPlotModel.Series.Add(new LineSeries { Title = "Accel X", ItemsSource = accelX });
@@ -374,6 +385,25 @@ namespace altis_gcs
         {
             MessageBox.Show("비상사출");
             /* 시험 발사 이전까지 비상 사출 신호 전달 로직 반드시 구현할 것 ! */
+
+            string message = "EJ";
+
+            try
+            {
+                if (_serialComm != null && !string.IsNullOrEmpty(message))
+                {
+                    _serialComm.Send(message);
+                    SystemLogs.Items.Add("Sent: " + message);
+                }
+                else
+                {
+                    MessageBox.Show("포트 연결되지 않음!");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("비상사출 실패: " + ex.Message);
+            }
         }
 
         private bool[] servoStates = new bool[5]; // 각 서보의 상태 저장
@@ -396,12 +426,11 @@ namespace altis_gcs
 
         private void Servo1_Click(object sender, RoutedEventArgs e)
         {
-            //테스트 위해 여기 위치함. 실제 적용 시 if문 내부로 넣을 것.
-            servoStates[0] = !servoStates[0]; // 토글(ON/OFF)
-            SetServoIndicator(0, servoStates[0]);
-
             if (_serialComm != null && _serialComm.IsConnected)
             {
+                servoStates[0] = !servoStates[0]; // 토글(ON/OFF)
+                SetServoIndicator(0, servoStates[0]);
+
                 _serialComm.Send("SERVO1");
                 SystemLogs.Items.Add("Servo 1 activated.");
             }
@@ -413,11 +442,12 @@ namespace altis_gcs
 
         private void Servo2_Click(object sender, RoutedEventArgs e)
         {
-            servoStates[1] = !servoStates[1]; // 토글(ON/OFF)
-            SetServoIndicator(1, servoStates[1]);
 
             if (_serialComm != null && _serialComm.IsConnected)
             {
+                servoStates[1] = !servoStates[1]; // 토글(ON/OFF)
+                SetServoIndicator(1, servoStates[1]);
+
                 _serialComm.Send("SERVO2");
                 SystemLogs.Items.Add("Servo 2 activated.");
             }
@@ -429,11 +459,12 @@ namespace altis_gcs
 
         private void Servo3_Click(object sender, RoutedEventArgs e)
         {
-            servoStates[2] = !servoStates[2];
-            SetServoIndicator(2, servoStates[2]);
 
             if (_serialComm != null && _serialComm.IsConnected)
             {
+                servoStates[2] = !servoStates[2];
+                SetServoIndicator(2, servoStates[2]);
+
                 _serialComm.Send("SERVO3");
                 SystemLogs.Items.Add("Servo 3 activated.");
             }
@@ -445,11 +476,12 @@ namespace altis_gcs
 
         private void Servo4_Click(object sender, RoutedEventArgs e)
         {
-            servoStates[3] = !servoStates[3];
-            SetServoIndicator(3, servoStates[3]);
 
             if (_serialComm != null && _serialComm.IsConnected)
             {
+                servoStates[3] = !servoStates[3];
+                SetServoIndicator(3, servoStates[3]);
+
                 _serialComm.Send("SERVO4");
                 SystemLogs.Items.Add("Servo 4 activated.");
             }
@@ -461,11 +493,12 @@ namespace altis_gcs
 
         private void Servo5_Click(object sender, RoutedEventArgs e)
         {
-            servoStates[4] = !servoStates[4];
-            SetServoIndicator(4, servoStates[4]);
 
             if (_serialComm != null && _serialComm.IsConnected)
             {
+                servoStates[4] = !servoStates[4];
+                SetServoIndicator(4, servoStates[4]);
+
                 _serialComm.Send("SERVO5");
                 SystemLogs.Items.Add("Servo 5 activated.");
             }

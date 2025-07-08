@@ -5,7 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Runtime.InteropServices;
-using altis_gcs; // ParameterSettings, TelemetryData 등 별도 파일 참조
+using altis_gcs;
+using System.IO;
+using System.Linq; // ParameterSettings, TelemetryData 등 별도 파일 참조
 
 namespace altis_gcs
 {
@@ -114,12 +116,16 @@ namespace altis_gcs
                     int bytesRead = 0;
                     try
                     {
-                        bytesRead = await Task.Run(() => serialPort.Read(buffer, 0, buffer.Length), cancellationToken);
+                        bytesRead = await serialPort.BaseStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                     }
-                    catch (TimeoutException)
+                    catch (IOException ex)
                     {
-                        // Timeout은 빈번히 발생할 수 있으므로 무시하고 루프를 계속 진행
-                        continue;
+                        DataReceived?.Invoke(this, $"비정상 IO 종료: {ex.Message}");
+                        continue; // ignore
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break; // 취소 요청 시 루프 종료
                     }
 
                     if (bytesRead > 0)
@@ -127,7 +133,8 @@ namespace altis_gcs
                         if (parameterSettings.CommType == CommunicationType.Binary)
                         {
                             ProcessBinaryPacket(buffer.AsSpan(0, 56));
-                        } else
+                        }
+                        else
                         {
                             await writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, bytesRead), cancellationToken);
                         }
@@ -143,7 +150,6 @@ namespace altis_gcs
                 ArrayPool<byte>.Shared.Return(buffer);
                 await writer.CompleteAsync();
             }
-
         }
 
         private unsafe void ProcessBinaryPacket(Span<byte> data)
@@ -223,36 +229,75 @@ namespace altis_gcs
 
             string[] values = lineStr.Split(',');
 
-            if (parameterSettings.ParameterCount == 0 ||
-                values.Length != parameterSettings.ParameterCount)
+            // 필드 개수 확인 (Parsing order에 따라 16개 예상)
+            // parameterSettings.ParameterCount가 16으로 설정되어야 합니다.
+            if (values.Length != 16) // 이 값을 하드코딩하거나 parameterSettings에서 가져와야 함
             {
-                DataReceived?.Invoke(this, $"Invalid data format: {lineStr}");
+                DataReceived?.Invoke(this, $"Invalid CSV data format (expected 16 fields): {lineStr}");
                 return;
             }
 
             var telemetryData = new TelemetryData();
-            for (int i = 0; i < parameterSettings.ParameterCount; i++)
+
+            telemetryData.Time = long.Parse(values[0]);
+            telemetryData.Altitude = double.Parse(values[1]);
+            telemetryData.Velocity = double.Parse(values[2]);
+            telemetryData.AccelX = double.Parse(values[3]);
+            telemetryData.AccelY = double.Parse(values[4]);
+            telemetryData.AccelZ = double.Parse(values[5]);
+            telemetryData.GyroX = double.Parse(values[6]);
+            telemetryData.GyroY = double.Parse(values[7]);
+            telemetryData.GyroZ = double.Parse(values[8]);
+            telemetryData.QuaternionX = double.Parse(values[9]);
+            telemetryData.QuaternionY = double.Parse(values[10]);
+            telemetryData.QuaternionZ = double.Parse(values[11]);
+            telemetryData.QuaternionW = double.Parse(values[12]);
+
+            // 7. ftv_ej (3개) - 필요에 따라 TelemetryData에 추가 속성 정의
+            // 현재는 파싱만 하고 특별히 저장하지 않음.
+            //currentIndex += 3; // 3개 스킵하거나 저장
+
+            // 선택적으로 Dictionary에도 저장 (기존 ParameterSettings 방식 유지를 원한다면)
+            // 이 부분은 데이터를 어떻게 활용할지에 따라 다릅니다.
+            // 직접적인 속성으로 저장하는 것이 더 효율적일 수 있습니다.
+            for (int i = 0; i < values.Length; i++)
             {
                 if (double.TryParse(values[i], out double value))
                 {
-                    string paramName = parameterSettings.ParameterOrder[i];
-                    telemetryData.Parameters[paramName] = value;
+                    if (i < parameterSettings.ParameterOrder.Count)
+                    {
+                        string paramName = parameterSettings.ParameterOrder[i].Trim();
+                        telemetryData.Parameters[paramName] = value;
+                    }
                 }
             }
 
+
             TelemetryDataParsed?.Invoke(this, telemetryData);
+            DataReceived?.Invoke(this, $"[DEBUG] Parsed: {string.Join(",", telemetryData.Parameters.Select(kv => $"{kv.Key}={kv.Value}"))}");
+
         }
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TelemetryPacket
     {
-        public long Timestamp;
+        public long Time;
+        public double Altitude;
+        public double Velocity;
         public double AccelX;
         public double AccelY;
         public double AccelZ;
         public double GyroX;
         public double GyroY;
         public double GyroZ;
+        public double QuaternionX;
+        public double QuaternionY;
+        public double QuaternionZ;
+        public double QuaternionW;
+        public double ftv_ej1;
+        public double ftv_ej2;
+        public double ftv_ej3;
     }
+
 }
