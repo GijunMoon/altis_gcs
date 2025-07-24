@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Controls.Primitives;
 using Microsoft.Win32;
 using OxyPlot;
 using OxyPlot.Series;
@@ -124,6 +125,10 @@ namespace altis_gcs
                     Dispatcher.Invoke(() =>
                     {
                         SystemLogs.Items.Add(data.ToString());
+                        // ScrollViewer 강제 스크롤 다운
+                        var scrollViewer = FindDescendant<ScrollViewer>(SystemLogs);
+                        scrollViewer?.ScrollToEnd();
+
                         // UI 업데이트 (예: Roll, Pitch, Yaw 표시)
                         if (data.Parameters.ContainsKey("Roll")) RollData.Text = data.Parameters["Roll"].ToString();
                         if (data.Parameters.ContainsKey("Pitch")) PitchData.Text = data.Parameters["Pitch"].ToString();
@@ -145,6 +150,27 @@ namespace altis_gcs
                 MessageBox.Show($"연결 실패: {ex.Message}");
             }
         }
+
+        public static T FindDescendant<T>(DependencyObject d) where T : DependencyObject
+        {
+            if (d == null)
+                return null;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(d, i);
+
+                if (child is T t)
+                    return t;
+
+                T descendant = FindDescendant<T>(child);
+                if (descendant != null)
+                    return descendant;
+            }
+
+            return null;
+        }
+
 
         private void Disconnect_Click(object sender, RoutedEventArgs e)
         {
@@ -310,14 +336,27 @@ namespace altis_gcs
             {
                 List<string> data = new List<string>
                 {
-                    "Time,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ"
+                    "Time,Altitude,Velocity,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,QuaternionX,QuaternionY,QuaternionZ,ftv_ej1,ftv_ej2,ftv_ej3"
                 };
                 /*비행데이터 컨트롤 로직 작성*/
                 foreach(var telemetryData in _flightDataLog)
                 {
-                    string line = $"{telemetryData.Timestamp},{telemetryData.Parameters["AccelX"]},{telemetryData.Parameters["AccelY"]}," +
-                                  $"{telemetryData.Parameters["AccelZ"]},{telemetryData.Parameters["GyroX"]},{telemetryData.Parameters["GyroY"]}," +
-                                  $"{telemetryData.Parameters["GyroZ"]}";
+                    string line = $"{telemetryData.Time}," +
+                                  $"{telemetryData.Altitude}," +
+                                  $"{telemetryData.Velocity}," +
+                                  $"{telemetryData.AccelX}," +
+                                  $"{telemetryData.AccelY}," +
+                                  $"{telemetryData.AccelZ}," +
+                                  $"{telemetryData.GyroX}," +
+                                  $"{telemetryData.GyroY}," +
+                                  $"{telemetryData.GyroZ}," +
+                                  $"{telemetryData.QuaternionX}," +
+                                  $"{telemetryData.QuaternionY}," +
+                                  $"{telemetryData.QuaternionZ}," +
+                                  $"{telemetryData.QuaternionW}," +
+                                  $"{(telemetryData.ftv_ej1 ? 1 : 0)}," +
+                                  $"{(telemetryData.ftv_ej2 ? 1 : 0)}," +
+                                  $"{(telemetryData.ftv_ej3 ? 1 : 0)}";
                     data.Add(line);
                 }
                 File.WriteAllLines(saveFileDialog.FileName, data);
@@ -363,7 +402,7 @@ namespace altis_gcs
         private void ResetSystem_Click(object sender, RoutedEventArgs e)
         {
             _timerManager.Reset();
-            MessageBox.Show("시스템 리셋");
+            MessageBox.Show("미구현 기능입니다.");
             /*시스템 리셋 로직 구현*/
         }
 
@@ -386,14 +425,16 @@ namespace altis_gcs
             MessageBox.Show("비상사출");
             /* 시험 발사 이전까지 비상 사출 신호 전달 로직 반드시 구현할 것 ! */
 
-            string message = "EJ";
+            string rawPayload = "EJECT";
+            //string atCommand = $"AT+SEND=0,{rawPayload.Length},{rawPayload}";
+
 
             try
             {
-                if (_serialComm != null && !string.IsNullOrEmpty(message))
+                if (_serialComm != null && !string.IsNullOrEmpty(rawPayload))
                 {
-                    _serialComm.Send(message);
-                    SystemLogs.Items.Add("Sent: " + message);
+                    _serialComm.Send(rawPayload);
+                    SystemLogs.Items.Add("Sent: " + rawPayload);
                 }
                 else
                 {
