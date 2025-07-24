@@ -30,6 +30,10 @@ namespace altis_gcs
         public double Altitude { get; set; }
         public double Velocity { get; set; }
 
+        public bool ftv_ej1 { get; set; }
+        public bool ftv_ej2 { get; set; }
+        public bool ftv_ej3 { get; set; }
+
 
         public TelemetryData()
         {

@@ -231,50 +231,49 @@ namespace altis_gcs
 
             // 필드 개수 확인 (Parsing order에 따라 16개 예상)
             // parameterSettings.ParameterCount가 16으로 설정되어야 합니다.
-            if (values.Length != 16) // 이 값을 하드코딩하거나 parameterSettings에서 가져와야 함
+            try
             {
-                DataReceived?.Invoke(this, $"Invalid CSV data format (expected 16 fields): {lineStr}");
-                return;
-            }
-
-            var telemetryData = new TelemetryData();
-
-            telemetryData.Time = long.Parse(values[0]);
-            telemetryData.Altitude = double.Parse(values[1]);
-            telemetryData.Velocity = double.Parse(values[2]);
-            telemetryData.AccelX = double.Parse(values[3]);
-            telemetryData.AccelY = double.Parse(values[4]);
-            telemetryData.AccelZ = double.Parse(values[5]);
-            telemetryData.GyroX = double.Parse(values[6]);
-            telemetryData.GyroY = double.Parse(values[7]);
-            telemetryData.GyroZ = double.Parse(values[8]);
-            telemetryData.QuaternionX = double.Parse(values[9]);
-            telemetryData.QuaternionY = double.Parse(values[10]);
-            telemetryData.QuaternionZ = double.Parse(values[11]);
-            telemetryData.QuaternionW = double.Parse(values[12]);
-
-            // 7. ftv_ej (3개) - 필요에 따라 TelemetryData에 추가 속성 정의
-            // 현재는 파싱만 하고 특별히 저장하지 않음.
-            //currentIndex += 3; // 3개 스킵하거나 저장
-
-            // 선택적으로 Dictionary에도 저장 (기존 ParameterSettings 방식 유지를 원한다면)
-            // 이 부분은 데이터를 어떻게 활용할지에 따라 다릅니다.
-            // 직접적인 속성으로 저장하는 것이 더 효율적일 수 있습니다.
-            for (int i = 0; i < values.Length; i++)
-            {
-                if (double.TryParse(values[i], out double value))
+                if (values.Length < 16)
                 {
-                    if (i < parameterSettings.ParameterOrder.Count)
-                    {
-                        string paramName = parameterSettings.ParameterOrder[i].Trim();
-                        telemetryData.Parameters[paramName] = value;
-                    }
+                    DataReceived?.Invoke(this, $"Invalid field count: {values.Length} → {lineStr}");
+                    return;
                 }
+
+                var telemetryData = new TelemetryData
+                {
+                    Time = long.Parse(values[0]),
+                    Altitude = float.Parse(values[1]),
+                    Velocity = float.Parse(values[2]),
+                    AccelX = float.Parse(values[3]),
+                    AccelY = float.Parse(values[4]),
+                    AccelZ = float.Parse(values[5]),
+                    GyroX = float.Parse(values[6]),
+                    GyroY = float.Parse(values[7]),
+                    GyroZ = float.Parse(values[8]),
+                    QuaternionX = float.Parse(values[9]),
+                    QuaternionY = float.Parse(values[10]),
+                    QuaternionZ = float.Parse(values[11]),
+                    QuaternionW = float.Parse(values[12]),
+                    ftv_ej1 = values[13] == "1",
+                    ftv_ej2 = values[14] == "1",
+                    ftv_ej3 = values[15] == "1"
+                };
+
+                // Parameters 딕셔너리에도 넣기
+                for (int i = 0; i < Math.Min(values.Length, parameterSettings.ParameterOrder.Count); i++)
+                {
+                    if (double.TryParse(values[i], out var value))
+                        telemetryData.Parameters[parameterSettings.ParameterOrder[i]] = value;
+                }
+
+                DataReceived?.Invoke(this, $"[Parsed OK]: {string.Join(",", telemetryData.Parameters.Select(kv => $"{kv.Key}={kv.Value}"))}");
+
+                TelemetryDataParsed?.Invoke(this, telemetryData);
             }
-
-
-            TelemetryDataParsed?.Invoke(this, telemetryData);
-            DataReceived?.Invoke(this, $"[DEBUG] Parsed: {string.Join(",", telemetryData.Parameters.Select(kv => $"{kv.Key}={kv.Value}"))}");
+            catch (Exception ex)
+            {
+                DataReceived?.Invoke(this, $"[Telemetry Parse Fail] {ex.Message}");
+            }
 
         }
     }
@@ -283,21 +282,22 @@ namespace altis_gcs
     public struct TelemetryPacket
     {
         public long Time;
-        public double Altitude;
-        public double Velocity;
-        public double AccelX;
-        public double AccelY;
-        public double AccelZ;
-        public double GyroX;
-        public double GyroY;
-        public double GyroZ;
-        public double QuaternionX;
-        public double QuaternionY;
-        public double QuaternionZ;
-        public double QuaternionW;
-        public double ftv_ej1;
-        public double ftv_ej2;
-        public double ftv_ej3;
+        public float Altitude;
+        public float Velocity;
+        public float AccelX;
+        public float AccelY;
+        public float AccelZ;
+        public float GyroX;
+        public float GyroY;
+        public float GyroZ;
+        public float QuaternionX;
+        public float QuaternionY;
+        public float QuaternionZ;
+        public float QuaternionW;
+        public bool ftv_ej1; //강제사출
+        public bool ftv_ej2; //타이머
+        public bool ftv_ej3; //고도
     }
+    /*특수 문자열 (사출) : EJECT_parachute*/
 
 }
